@@ -1,0 +1,8 @@
+= kubernetes
+:toc:
+:toc-title: 目录
+:toclevels: 5
+:sectnums:
+
+kubernetes的相关知识
+
