@@ -1,0 +1,8 @@
+= linux
+:toc:
+:toc-title: 目录
+:toclevels: 5
+:sectnums:
+
+linux 的相关知识
+
