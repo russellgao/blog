@@ -22,6 +22,9 @@
 - kubernetes
 - 网络
 
+== 算法和编程
+算法和编程的介绍参见: link:https://github.com/russellgao/algorithm[]
+
 == 关于作者
 云原生爱好者，专注于devops，ops，kubernetes，云原生，算法等领域，可以关注作者个人公众号
 ，不定期会有干货分享，可以及时推送给您，欢迎随时交流哟！
