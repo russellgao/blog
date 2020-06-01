@@ -1,0 +1,14 @@
+= ethtool
+:toc: right
+:toc-title:
+:toclevels:
+:sectnums:
+
+== 介绍
+ethtool命令用于获取以太网卡的配置信息，或者修改这些配置。这个命令比较复杂，功能特别多。
+
+== 参考
+- https://www.cnblogs.com/bangerlee/archive/2013/04/05/3000784.html
+
+
+
