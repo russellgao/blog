@@ -5,7 +5,7 @@
 :sectnums:
 
 == 常见的抓包工具
-- wireshark
-- tcpdump
+- link:wireshark.adoc[wireshark]
+- link:tcpdump.adoc[tcpdump]
 
 
