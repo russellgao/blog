@@ -1,0 +1,17 @@
+= BGP 协议
+:toc:
+:toc-title: 目录
+:toclevels: 5
+:sectnums:
+
+== 介绍
+BGP全称是Border Gateway Protocol, 对应中文是边界网关协议。
+
+BGP是互联网上一个核心的去中心化自治路由协议。从这个解释来看，首先这是一个用于互联网（Internet）上的路由协议。它的地位是核心的（目前是最重要的，互联网上唯一使用的路由协议），它的目的是去中心化，以达到各个网络自治。
+
+先看看几个相关的概念
+
+=== AS（Autonomous system）自治系统
+
+
+
