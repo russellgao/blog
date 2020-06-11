@@ -6,3 +6,5 @@
 
 kubernetes的相关知识
 
+== 参考
+- https://www.kubernetes.org.cn/
