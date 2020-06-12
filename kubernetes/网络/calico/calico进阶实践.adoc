@@ -1,0 +1,22 @@
+= 容器网络Calico进阶实践
+:toc:
+:toc-title: 目录
+:toclevels: 5
+:sectnums:
+
+== Calico 架构
+Calico 是一个三层的数据中心网络方案，而且方便集成 OpenStack 这种 IaaS 云架构，能够提供高效可控的 VM、容器、裸机之间的通信。三层通信模型表示每个容器都通过 IP 直接通信，中间通过路由转发找到对方。在这个过程中，容器所在的节点类似于传统的路由器，提供了路由查找的功能。
+
+Calico创建和管理一个扁平的三层网络（不需要overlay），每个容器会分配一个可路由的IP。由于通信时不需要解包和封包，网络性能损耗小，易于排查，且易于水平扩展。
+
+小规模部署时可以通过BGP client直接互联，大规模下可通过指定的BGP Route Reflector来完成，这样保证所有的数据流量都是通过IP路由的方式完成互联的。
+
+Calico基于iptables还提供了丰富而灵活的网络Policy，保证通过各个节点上的ACL来提供Workload的多租户隔离、安全组以及其他可达性限制等功能。
+
+要想路由工作能够正常，每个虚拟路由器（容器所在的主机节点）必须有某种方法知道整个集群的路由信息，calico 采用的是 BGP 路由协议，全称是 Border Gateway Protocol。
+
+
+
+== 参考
+
+- https://blog.csdn.net/ccy19910925/article/details/82423452
