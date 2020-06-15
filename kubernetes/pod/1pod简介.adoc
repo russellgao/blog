@@ -35,5 +35,74 @@ Scheduler 读取到写入到 etcd 中的 pod 信息，然后基于一系列规�
 === 预选策略
 预选策略就是节点过滤器，例如 MathNodeSelector 实现的规则，以及 PodFitsResources 实现的规则等。执行预选操作时，如果不存在适合的节点，此时 pod 会一直处于 pending 状态，直到至少有一个可用节点。
 
+支持的预选策略列举一下（1.10版本）：
+
+- CheckNodeCondition
+- General
+- NoDiskConflict
+- PodToleratesNodeTaintsPodToleratesNodeNoExecuteTaints
+- CheckServiceAffinity
+- MaxEBsVolumeCount
+- MaxGCEPDVolumeCount
+- MaxAzureDiskVolumeCount
+- CheckVolumeBinding
+- NoVolumeZoneConflict
+- CheckNodeMemoryPressure
+- CheckNodePIDPressure
+- CheckNodeDiskPressure
+- MatchInterPodAffinity
+
+简单介绍几种
+
+- CheckNodeCondition：检查是否可以在节点报告磁盘、网络不可用或未准备好的情况下将 pod 对象调度其上。
+- NoDiskConflict：检查 pod 对象请求的存储卷在此节点上是否可用，若不存在冲突则通过检查。
+- MathNodeSelector：若 pod 对象定义了 spec.NodeSelector 属性，则检查节点标签是否能匹配此属性值。
+
+优选函数
+
+常用优选函数：
+
+- BalancedResourceAllocation
+- LeaastRequstedPriority
+- NodePreferAvoidPodsPriority
+- NodeAffinityPriority
+- TaintTolerationPriority
+- InterPodAffinityPriority
+- SelectorSpreadPriority
+- NodeLabelPriority
+- MostRequestedPriority
+- ImageLoccalityPriority
+
+此外调度器支持为每个优选函数指定一个简单的整数值表示权重，进行节点优先级分值的计算，计算公式如下： FinalScoreNode = (weight1 * priorityFunc1) + (weight2 * priorityFunc2)+ ....
+
+TaintToleraionPriority：基于Pod资源对节点的污点容忍调度偏好进行其优先级的评估，它将 Pod 对象的 tolerations 列表与节点的污点进行匹配度检查，成功匹配的条目越多，则节点得分越低。
+
+NodeAffinityPriority：基于节点亲和性调度偏好进行优先级评估，它将根据 Pod 资源中的 nodeSelector 对给定节点进行匹配度计算，成功匹配到的条目越多则节点得分越高。
+
+对于上述节点调度中还包括一些节点亲和度：硬亲和度和软亲和性、资源亲和调度。硬亲和调度和软亲和调度以及反亲和调度、污点容忍度等，都是 pod 调度的策略，不一一详述。
+当 scheduler 通过一系列策略选定 pod 运行节点之后将结果信息更新至 API Server，由 API Server 更新至 etcd 中，并由 API Server 反映调度结果，接下来由 kubelet 在所选定的节点上启动 pod。
+
+== 容器生命周期的几种行为
+=== 初始化容器
+初始化容器即 pod 内主容器启动之前要运行的容器，主要是做一些前置工作，初始化容器具有以下特征：
+初始化容器必须首先执行，若初始化容器运行失败，集群会一直重启初始化容器直至完成，注意，如果 pod 的重启策略为 Never，那初始化容器启动失败后就不会重启。
+初始化容器必须按照定义的顺序执行，初始化容器可以通过 pod 的 spec.initContainers 进行定义。
+
+=== 钩子函数
+Kubernetes 为容器提供了两种生命周期钩子：
+
+- Poststart:于容器创建完成之后立即运行的钩子程序。
+- preStop:容器终止之前立即运行的程序，是以同步方式的进行，因此其完成之前会阻塞 删除容器的调用
+
+备注：钩子程序的执行方式有“Exec”和“HTTP”两种。
+
+=== 容器探测
+容器探测分为存活性探测和就绪性探测容器探测是kubelet对容器健康状态进行诊断，容器探测的方式主要以下三种：
+
+- ExecAction：在容器中执行命令，根据返回的状态码判断容器健康状态，返回0即表示成功，否则为失败。
+- TCPSocketAction: 通过与容器的某TCP端口尝试建立连接进行诊断，端口能打开即为表示成功，否则失败。
+- HTTPGetAction：向容器指定 URL 发起 HTTP GET 请求，响应码为2xx或者是3xx为成功，否则失败。
+
+
 
 
