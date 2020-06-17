@@ -1,0 +1,206 @@
+= kustomize 简介
+:toc:
+:toc-title: 目录
+:toclevels: 5
+:sectnums:
+
+== kustomize 是什么
+kustomize 是 kubernetes 原生的配置管理，以无模板方式来定制应用的配置。kustomize 使用 k8s 原生概念帮助创建并复用资源配置(YAML)，允许用户以一个应用描述文件 （YAML 文件）为基础（Base YAML），然后通过 Overlay 的方式生成最终部署应用所需的描述文件。
+
+== kustomize 解决了什么痛点
+一般应用都会存在多套部署环境：开发环境、测试环境、生产环境，多套环境意味着存在多套 K8S 应用资源 YAML。而这么多套 YAML 之间只存在微小配置差异，比如镜像版本不同、Label 不同等，而这些不同环境下的YAML 经常会因为人为疏忽导致配置错误。再者，多套环境的 YAML 维护通常是通过把一个环境下的 YAML 拷贝出来然后对差异的地方进行修改。一些类似 Helm 等应用管理工具需要额外学习DSL 语法。总结以上，在 k8s 环境下存在多套环境的应用，经常遇到以下几个问题：
+
+- 如何管理不同环境或不同团队的应用的 Kubernetes YAML 资源
+- 如何以某种方式管理不同环境的微小差异，使得资源配置可以复用，减少 copy and change 的工作量
+- 如何简化维护应用的流程，不需要额外学习模板语法
+
+Kustomize 通过以下几种方式解决了上述问题：
+
+- kustomize 通过 Base & Overlays 方式(下文会说明)方式维护不同环境的应用配置
+- kustomize 使用 patch 方式复用 Base 配置，并在 Overlay 描述与 Base 应用配置的差异部分来实现资源复用
+- kustomize 管理的都是 Kubernetes 原生 YAML 文件，不需要学习额外的 DSL 语法
+
+== kustomize 术语
+在 kustomize 项目的文档中，经常会出现一些专业术语，这里总结一下常见的术语，方便后面讲解
+
+=== kustomization
+术语 kustomization 指的是 kustomization.yaml 文件，或者指的是包含 kustomization.yaml 文件的目录以及它里面引用的所有相关文件路径
+
+=== base
+base 指的是一个 kustomization , 任何的 kustomization 包括 overlay (后面提到)，都可以作为另一个 kustomization 的 base (简单理解为基础目录)。base 中描述了共享的内容，如资源和常见的资源配置
+
+=== overlay
+overlay 是一个 kustomization, 它修改(并因此依赖于)另外一个 kustomization. overlay 中的 kustomization指的是一些其它的 kustomization, 称为其 base. 没有 base, overlay 无法使用，并且一个 overlay 可以用作 另一个 overlay 的 base(基础)。简而言之，overlay 声明了与 base 之间的差异。通过 overlay 来维护基于 base 的不同 variants(变体)，例如开发、QA 和生产环境的不同 variants
+
+=== variant
+variant 是在集群中将 overlay 应用于 base 的结果。例如开发和生产环境都修改了一些共同 base 以创建不同的 variant。这些 variant 使用相同的总体资源，并与简单的方式变化，例如 deployment 的副本数、ConfigMap使用的数据源等。简而言之，variant 是含有同一组 base 的不同 kustomization
+
+=== resource
+在 kustomize 的上下文中，resource 是描述 k8s API 对象的 YAML 或 JSON 文件的相对路径。即是指向一个声明了 kubernetes API 对象的 YAML 文件
+
+=== patch
+修改文件的一般说明。文件路径，指向一个声明了 kubernetes API patch 的 YAML 文件
+
+== kustomize 官方示例
+现在通过官方的示例来演示一下 kustomize 应该怎么用，以及相应的一些规范。如果你没有使用 Kubernetes v1.14 版本，参考 link:https://kubernetes-sigs.github.io/kustomize/installation/[官方安装教程] 进行安装 kustomize，或者直接下载 v1.14 版本kubectl 二进制，通过kubectl -k 命令使用 kustomize
+
+=== 前提
+- 三个不同的环境(开发、演示、生产)
+- 一个 deployments 资源和 service 资源
+- 环境之间有不同的 replicas 或者 ConfigMap
+
+=== 最终文件结构
+```
+demo
+├── base
+│   ├── configMap.yaml
+│   ├── deployment.yaml
+│   ├── kustomization.yaml
+│   └── service.yaml
+└── overlays
+    ├── production
+    │   ├── deployment.yaml
+    │   └── kustomization.yaml
+    └── staging
+        ├── kustomization.yaml
+        └── map.yaml
+```
+
+=== 新建一个 Base 目录
+这里使用官网的 helloWorld 的 YAML 资源文件作为示例，在 base 目录下新增几个 k8s YAML 资源文件，文件结构如下：
+
+```
+demo
+└── base
+    ├── configMap.yaml
+    ├── deployment.yaml
+    ├── kustomization.yaml
+    └── service.yaml
+```
+
+接下来看看 kustomization.yaml 配置文件中包含什么内容：
+
+```
+commonLabels:
+  app: hello
+
+resources:
+- deployment.yaml
+- service.yaml
+- configMap.yaml
+```
+
+这个文件声明了这些 YAML 资源(deployments、services、configmap 等)以及要应用于它们的一些自定义，如添加一个通用的标签。kustomization 还提供了namePrefix、commonAnnoations、images 等配置项，全部配置在github 的示例 kustomization.yaml 中。
+
+这时候，可以通过 kustomize build 命令来看完整的配置：
+
+```
+$ kustomize build demo/base
+$ kustomize build demo/base | kubectl apply -f -  # 这种方式直接部署在集群中
+$ kubectl apply -k # 1.14 版本可以直接使用该命令部署应用于集群中
+```
+
+build 出来的 YAML 每个资源对象上都会存在通用的标签 app: hello
+
+=== 创建 Overlays
+创建一个 staging 和 production overlay，目录树结构如下所示：
+
+```
+demo
+├── base
+│   ├── configMap.yaml
+│   ├── deployment.yaml
+│   ├── kustomization.yaml
+│   └── service.yaml
+└── overlays
+    ├── production
+    └── staging
+```
+=== 演示环境 kustomization
+在 staging kustomization 文件中，定义一个新的名称前辍以及一些不同的标签
+
+```
+# 文件路径 demo/overlays/staging/kustomization.yaml
+namePrefix: staging-
+commonLabels:
+  variant: staging
+  org: acmeCorporation
+commonAnnotations:
+  note: Hello, I am staging!
+bases:
+- ../../base
+patchesStrategicMerge:
+- map.yaml
+```
+
+=== 演示环境 patch
+添加一个 ConfigMap 自定义把 base 中的 ConfigMap 中的 "Good Morning!" 变成 "Good Night!"
+
+```
+# 文件路径 demo/overlays/staging/map.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: the-map
+data:
+  altGreeting: "Have a pineapple!"
+  enableRisky: "true"
+```
+
+=== 生产环境 kustoimzation
+在生产环境目录下，创建一个 kustomization.yaml 文件，定义不同的名称及标签
+
+```
+# 文件路径 demo/overlays/production/kustomization.yaml
+namePrefix: production-
+commonLabels:
+  variant: production
+  org: acmeCorporation
+commonAnnotations:
+  note: Hello, I am production!
+bases:
+- ../../base
+patchesStrategicMerge:
+- deployment.yaml
+```
+
+=== 生产环境 patch
+```
+# demo/overlays/production/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: the-deployment
+spec:
+  replicas: 10
+```
+
+=== 部署不同环境
+需要在生产环境部署应用，通过下面命令
+```
+$ kustomize build demo/overlays/production | kubectl apply -f -   # 或者 kubectl apply -k
+```
+
+需要在演示环境部署应用，通过下面命令
+
+```
+$ kustomize build demo/overlays/staging | kubectl apply -f -     # 或者 kubectl apply -k
+```
+
+=== kustomize vs Helm
+通过上面对 kustomize 的讲解，可能已经有人注意到它与 Helm 有一定的相似。先来看看 Helm 的定位：Kubernetes 的包管理工具，而 kustomize 的定位是：Kubernetes 原生配置管理。两者定位领域有很大不同，Helm 通过将应用抽象成 Chart 来管理, 专注于应用的操作、复杂性管理等, 而 kustomize 关注于 k8s API 对象的管理。下面列举了一些它们之间的区别(不是特别全面,欢迎补充或修正)：
+
+Helm 提供应用描述文件模板(Go template)，在部署时通过字符替换方式渲染成 YAML，对应用描述文件具有侵入性。Kustomize 使用原生 k8s 对象，无需模板参数化，无需侵入应用描述文件(YAML), 通过 overlay 选择相应 patch 生成最终 YAML
+Helm 专注于应用的复杂性及生命周期管理(包括 install、upgrade、rollback)，kustomize 通过管理应用的描述文件来间接管理应用
+Helm 使用 Chart 来管理应用，Chart 相对固定、稳定，相当于静态管理，更适合对外交付使用，而 kustomize 管理的是正在变更的应用，可以 fork 一个新版本，创建新的 overlay 将应用部署在新的环境，相当于动态管理，适合于 DevOps 流程
+Helm 通过 Chart 方式打包并管理应用版本，kustomize 通过 overlay 方式管理应用不同的变体，通过 Git 来版本管理
+Helm 在v3 版本前有 Helm 和 Tiller 两组件，需要一定配置，而 kustomize 只有一个二进制，开箱即用
+总的来说，Helm 有自己一套体系来管理应用，而 kustomize 更轻量级，融入Kubernetes 的设计理念，通过原生 k8s API 对象来管理应用
+
+
+== 参考
+- https://github.com/kubernetes-sigs/kustomize
+- https://zhuanlan.zhihu.com/p/92153378
+- https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/
+
+
