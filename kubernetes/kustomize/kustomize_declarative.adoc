@@ -1,0 +1,621 @@
+= 用kustomize 声明式管理 kubernetes 对象
+:toc:
+:toclevels: 5
+:toc-title: 目录
+:sectnums:
+
+
+== 介绍
+Kustomize是一个独立的工具，可通过kustomization文件来自定义Kubernetes对象。
+
+从1.14开始，Kubectl还支持使用kustomization文件管理Kubernetes对象。要查看在包含kustomization文件的目录中找到的资源，请运行以下命令：
+
+```
+kubectl kustomize <kustomization_directory>
+```
+
+为了应用这些资源，执行
+```
+kubectl apply -k
+or
+kubectl apply --kustomize
+```
+
+== Overview
+Kustomize是用于自定义Kubernetes配置的工具。它具有以下功能来管理应用程序配置文件
+
+- 从其他的源生成资源
+- 设置资源的跨领域
+- 组成和定制资源集合
+
+=== generateing Resources (生成资源)
+ConfigMap和Secrets保存其他Kubernetes对象（例如Pods）使用的配置或敏感数据。 ConfigMap或Secrets的真实来源通常位于群集外部，例如.properties文件或SSH密钥文件。 Kustomize具有secretGenerator和configMapGenerator，它们从文件或文字生成Secret和ConfigMap。
+
+==== configMapGenerator
+要从文件生成ConfigMap，请在configMapGenerator中的文件列表中添加一个条目。这是从.properties文件中使用数据项生成ConfigMap的示例：
+
+```
+# Create a application.properties file
+cat <<EOF >application.properties
+FOO=Bar
+EOF
+
+cat <<EOF >./kustomization.yaml
+configMapGenerator:
+- name: example-configmap-1
+  files:
+  - application.properties
+EOF
+```
+
+可以使用以下命令检查生成的ConfigMap
+
+```
+kubectl kustomize ./
+```
+
+生成的configMap :
+
+```
+apiVersion: v1
+data:
+  application.properties: |
+    FOO=Bar
+kind: ConfigMap
+metadata:
+  name: example-configmap-1-8mbdf7882g
+```
+
+ConfigMap也可以从文字键值对生成。要从文字键值对生成ConfigMap，请将条目添加到configMapGenerator中的文字列表中。这是使用键值对中的数据项生成ConfigMap的示例：
+
+```
+cat <<EOF >./kustomization.yaml
+configMapGenerator:
+- name: example-configmap-2
+  literals:
+  - FOO=Bar
+EOF
+```
+
+可以通过以下命令检查生成的ConfigMap：
+
+```
+kubectl kustomize ./
+```
+
+生成的ConfigMap :
+
+```
+apiVersion: v1
+data:
+  FOO: Bar
+kind: ConfigMap
+metadata:
+  name: example-configmap-2-g2hdhfc6tk
+```
+
+=== secretGenerator
+您可以从文件或文字键/值对生成Secrets。要从文件生成密钥，请将条目添加到secretGenerator中的文件列表中。这是从文件生成带有数据项的密钥的示例：
+
+```
+# Create a password.txt file
+cat <<EOF >./password.txt
+username=admin
+password=secret
+EOF
+
+cat <<EOF >./kustomization.yaml
+secretGenerator:
+- name: example-secret-1
+  files:
+  - password.txt
+EOF
+```
+
+生成的secret ：
+
+```
+apiVersion: v1
+data:
+  password.txt: dXNlcm5hbWU9YWRtaW4KcGFzc3dvcmQ9c2VjcmV0Cg==
+kind: Secret
+metadata:
+  name: example-secret-1-t2kt65hgtb
+type: Opaque
+```
+
+要从文字键值对生成Secret，请将条目添加到secretGenerator中的文字列表中。这是从键值对生成带有数据项的Secret的示例：
+
+```
+cat <<EOF >./kustomization.yaml
+secretGenerator:
+- name: example-secret-2
+  literals:
+  - username=admin
+  - password=secret
+EOF
+
+```
+
+生成的secret 如下:
+
+```
+apiVersion: v1
+data:
+  password: c2VjcmV0
+  username: YWRtaW4=
+kind: Secret
+metadata:
+  name: example-secret-2-t52t6g96d8
+type: Opaque
+```
+
+生成的ConfigMap和Secrets附加了内容哈希后缀。这样可以确保在更改内容时生成新的ConfigMap或Secret。要禁用添加后缀的行为，可以使用generatorOptions。除此之外，还可以为生成的ConfigMap和Secrets指定横切选项。
+
+```
+cat <<EOF >./kustomization.yaml
+configMapGenerator:
+- name: example-configmap-3
+  literals:
+  - FOO=Bar
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    type: generated
+  annotations:
+    note: generated
+EOF
+```
+
+运行 kubectl kustomize ./ 查看生成的ConfigMap
+```
+apiVersion: v1
+data:
+  FOO: Bar
+kind: ConfigMap
+metadata:
+  annotations:
+    note: generated
+  labels:
+    type: generated
+  name: example-configmap-3
+```
+
+== Setting cross-cutting fields (设置可以横跨多种资源的field)
+在项目中为所有Kubernetes资源设置跨领域字段是很常见的。设置跨领域字段的一些用例：
+
+- 设置namespace
+- 给 name 字段增加前缀后者后缀
+- 增加相同的lables
+- 增加相同的annotations
+
+例:
+
+```
+# Create a deployment.yaml
+cat <<EOF >./deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+EOF
+
+cat <<EOF >./kustomization.yaml
+namespace: my-namespace
+namePrefix: dev-
+nameSuffix: "-001"
+commonLabels:
+  app: bingo
+commonAnnotations:
+  oncallPager: 800-555-1212
+resources:
+- deployment.yaml
+EOF
+```
+
+生成的如下:
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    oncallPager: 800-555-1212
+  labels:
+    app: bingo
+  name: dev-nginx-deployment-001
+  namespace: my-namespace
+spec:
+  selector:
+    matchLabels:
+      app: bingo
+  template:
+    metadata:
+      annotations:
+        oncallPager: 800-555-1212
+      labels:
+        app: bingo
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+```
+
+== 组成和定制资源
+通常在项目中组合一组资源并在同一文件或目录中进行管理。 Kustomize提供了由不同文件组成资源并对其应用补丁或其他自定义设置的功能
+
+=== 构成
+Kustomize支持不同资源的组合。 kustomization.yaml文件中的resources字段定义要包含在配置中的资源列表。在资源列表中将路径设置为资源的配置文件。这是一个由Deployment和Service组成的NGINX应用程序的示例：
+
+```
+# Create a deployment.yaml file
+cat <<EOF > deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx
+spec:
+  selector:
+    matchLabels:
+      run: my-nginx
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        run: my-nginx
+    spec:
+      containers:
+      - name: my-nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+EOF
+
+# Create a service.yaml file
+cat <<EOF > service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-nginx
+  labels:
+    run: my-nginx
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+  selector:
+    run: my-nginx
+EOF
+
+# Create a kustomization.yaml composing them
+cat <<EOF >./kustomization.yaml
+resources:
+- deployment.yaml
+- service.yaml
+EOF
+```
+
+=== 自定义
+修补程序可用于将不同的自定义应用于资源。 Kustomize通过patchStrategicMerge和patchJson6902支持不同的修补机制。 patchStrategicMerge是文件路径的列表。每个文件都应解析为战略合并补丁。修补程序内的名称必须与已加载的资源名称匹配。建议做一件事的小补丁。例如，创建一个补丁以增加部署副本的数量，并创建另一个补丁以设置内存限制。
+
+```
+# Create a deployment.yaml file
+cat <<EOF > deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx
+spec:
+  selector:
+    matchLabels:
+      run: my-nginx
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        run: my-nginx
+    spec:
+      containers:
+      - name: my-nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+EOF
+
+# Create a patch increase_replicas.yaml
+cat <<EOF > increase_replicas.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx
+spec:
+  replicas: 3
+EOF
+
+# Create another patch set_memory.yaml
+cat <<EOF > set_memory.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx
+spec:
+  template:
+    spec:
+      containers:
+      - name: my-nginx
+        resources:
+        limits:
+          memory: 512Mi
+EOF
+
+cat <<EOF >./kustomization.yaml
+resources:
+- deployment.yaml
+patchesStrategicMerge:
+- increase_replicas.yaml
+- set_memory.yaml
+EOF
+```
+
+运行  kubectl kustomize ./ 查看生成的 Deployment
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      run: my-nginx
+  template:
+    metadata:
+      labels:
+        run: my-nginx
+    spec:
+      containers:
+      - image: nginx
+        limits:
+          memory: 512Mi
+        name: my-nginx
+        ports:
+        - containerPort: 80
+```
+
+并非所有的资源或字段都支持战略合并补丁。为了支持在任意资源中修改任意字段，Kustomize提供了通过patchJson6902应用JSON补丁的功能。要为Json补丁找到正确的资源，需要在kustomization.yaml中指定该资源的组，版本，种类和名称。例如，也可以通过patchJson6902来增加Deployment对象的副本数。
+
+```
+# Create a deployment.yaml file
+cat <<EOF > deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx
+spec:
+  selector:
+    matchLabels:
+      run: my-nginx
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        run: my-nginx
+    spec:
+      containers:
+      - name: my-nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+EOF
+
+# Create a json patch
+cat <<EOF > patch.yaml
+- op: replace
+  path: /spec/replicas
+  value: 3
+EOF
+
+# Create a kustomization.yaml
+cat <<EOF >./kustomization.yaml
+resources:
+- deployment.yaml
+
+patchesJson6902:
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: my-nginx
+  path: patch.yaml
+EOF
+```
+
+运行  kubectl kustomize ./ 查看生成的 Deployment
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      run: my-nginx
+  template:
+    metadata:
+      labels:
+        run: my-nginx
+    spec:
+      containers:
+      - image: nginx
+        name: my-nginx
+        ports:
+        - containerPort: 80
+```
+
+除修补程序外，Kustomize还提供自定义容器镜像或将其他对象中的字段值注入容器中而无需创建修补程序的功能。例如，您可以通过在kustomization.yaml的images字段中指定新镜像来更改容器内使用的镜像
+
+```
+cat <<EOF > deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx
+spec:
+  selector:
+    matchLabels:
+      run: my-nginx
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        run: my-nginx
+    spec:
+      containers:
+      - name: my-nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+EOF
+
+cat <<EOF >./kustomization.yaml
+resources:
+- deployment.yaml
+images:
+- name: nginx
+  newName: my.image.registry/nginx
+  newTag: 1.4.0
+EOF
+```
+
+运行  kubectl kustomize ./ 查看生成的 Deployment
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      run: my-nginx
+  template:
+    metadata:
+      labels:
+        run: my-nginx
+    spec:
+      containers:
+      - image: my.image.registry/nginx:1.4.0
+        name: my-nginx
+        ports:
+        - containerPort: 80
+```
+
+有时，在Pod中运行的应用程序可能需要使用其他对象的配置值。例如，来自Deployment对象的Pod需要从Env读取相应的服务名称或作为命令参数。由于服务名称可能会随着kustomization.yaml文件中添加的namePrefix或nameSuffix的更改而改变。不建议在命令参数中对服务名称进行硬编码。对于此用法，Kustomize可以通过vars将服务名称注入到容器中。
+
+```
+# Create a deployment.yaml file
+cat <<EOF > deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx
+spec:
+  selector:
+    matchLabels:
+      run: my-nginx
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        run: my-nginx
+    spec:
+      containers:
+      - name: my-nginx
+        image: nginx
+        command: ["start", "--host", "\$(MY_SERVICE_NAME)"]
+EOF
+
+# Create a service.yaml file
+cat <<EOF > service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-nginx
+  labels:
+    run: my-nginx
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+  selector:
+    run: my-nginx
+EOF
+
+cat <<EOF >./kustomization.yaml
+namePrefix: dev-
+nameSuffix: "-001"
+
+resources:
+- deployment.yaml
+- service.yaml
+
+vars:
+- name: MY_SERVICE_NAME
+  objref:
+    kind: Service
+    name: my-nginx
+    apiVersion: v1
+EOF
+```
+
+运行  kubectl kustomize ./ 查看生成的 Deployment
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-my-nginx-001
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      run: my-nginx
+  template:
+    metadata:
+      labels:
+        run: my-nginx
+    spec:
+      containers:
+      - command:
+        - start
+        - --host
+        - dev-my-nginx-001
+        image: nginx
+        name: my-nginx
+```
+
+== Bases and Overlays
+
+
+== 参考
+- https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/
+
+
