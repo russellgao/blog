@@ -104,5 +104,18 @@ Kubernetes 为容器提供了两种生命周期钩子：
 - HTTPGetAction：向容器指定 URL 发起 HTTP GET 请求，响应码为2xx或者是3xx为成功，否则失败。
 
 
+=== status.conditions
+这里再提一下 pod 的生命周期，pod 在初始化，到 pending，到分配到 node 的所有过程，都有个记录，这里的 status.conditions 就是这个记录，记录各种状态变更的时间节点：
 
+type字段是一个包含以下可能值的字符串：
+
+- PodScheduled：Pod 已被安排到一个节点;
+- Ready：Pod 能够提供请求，应该添加到所有匹配服务的负载均衡池中;
+- Initialized：所有 init 容器 都已成功启动;
+- Unschedulable：调度程序现在无法调度 Pod，例如由于缺少资源或其他限制;
+- ContainersReady：Pod 中的所有容器都已准备就绪。
+- lastTransitionTime 字段提供 Pod 最后从一个状态转换到另一个状态的时间戳
+
+=== qosClass
+Qos的三个级别，Guaranteed/Burstable/BestEffort，分别对pod的资源限制从严到弱。
 

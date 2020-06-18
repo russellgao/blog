@@ -234,3 +234,4 @@ web-server-1287567482-s330j    1/1       Running   0          7m        10.192.3
 
 == 参考
 - https://kubernetes.io/zh/docs/concepts/configuration/assign-pod-node/
+- https://www.cnblogs.com/breezey/p/9101666.html
