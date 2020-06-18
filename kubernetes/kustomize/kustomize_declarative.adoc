@@ -614,6 +614,8 @@ spec:
 
 == Bases and Overlays
 
+== kustomize 功能列别
+image:images/kustomize_d1.jpg[]
 
 == 参考
 - https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/
