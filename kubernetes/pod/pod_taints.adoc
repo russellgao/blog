@@ -1,0 +1,211 @@
+= 设置污点和容忍
+:toc:
+:toc-title: 目录
+:toclevels: 5
+:sectnums:
+
+== Taints和Tolerations（污点和容忍）
+Taint，它让Node拒绝Pod的运行
+
+Taint需要与Toleration配合使用，让pod避开那些不合适的node。在node上设置一个或多个Taint后，除非pod明确声明能够容忍这些“污点”，否则无法在这些node上运行。Toleration是pod的属性，让pod能够（注意，只是能够，而非必须）运行在标注了Taint的node上。
+
+== 基本用法
+=== 设置污点
+```
+kubectl taint --help
+Update the taints on one or more nodes.
+
+  *  A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.
+  *  The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to
+253 characters.
+  *  Optionally, the key can begin with a DNS subdomain prefix and a single '/', like example.com/my-app
+  *  The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up
+to  63 characters.
+  *  The effect must be NoSchedule, PreferNoSchedule or NoExecute.
+  *  Currently taint can only apply to node.
+
+Examples:
+  # Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'.
+  # If a taint with that key and effect already exists, its value is replaced as specified.
+  kubectl taint nodes foo dedicated=special-user:NoSchedule
+  # 给node 增加污点
+
+  # Remove from node 'foo' the taint with key 'dedicated' and effect 'NoSchedule' if one exists.
+  kubectl taint nodes foo dedicated:NoSchedule-
+  # 移除特定node 的 污点dedicated
+
+  # Remove from node 'foo' all the taints with key 'dedicated'
+  kubectl taint nodes foo dedicated-
+  # 移除所有node 的污点dedicated
+
+  # Add a taint with key 'dedicated' on nodes having label mylabel=X
+  kubectl taint node -l myLabel=X  dedicated=foo:PreferNoSchedule
+  # 通过label选定node 移除污点dedicated
+
+Options:
+      --all=false: Select all nodes in the cluster
+      --allow-missing-template-keys=true: If true, ignore any errors in templates when a field or map key is missing in
+the template. Only applies to golang and jsonpath output formats.
+  -o, --output='': Output format. One of:
+json|yaml|name|go-template|go-template-file|template|templatefile|jsonpath|jsonpath-file.
+      --overwrite=false: If true, allow taints to be overwritten, otherwise reject taint updates that overwrite existing
+taints.
+  -l, --selector='': Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)
+      --template='': Template string or path to template file to use when -o=go-template, -o=go-template-file. The
+template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
+      --validate=true: If true, use a schema to validate the input before sending it
+
+Usage:
+  kubectl taint NODE NAME KEY_1=VAL_1:TAINT_EFFECT_1 ... KEY_N=VAL_N:TAINT_EFFECT_N [options]
+
+Use "kubectl options" for a list of global command-line options (applies to all commands).
+
+#示例：
+kubectl taint node 10.3.1.16 test=16:NoSchedule
+```
+
+其中[effect] 可取值： [ NoSchedule | PreferNoSchedule | NoExecute ]
+
+- NoSchedule ：一定不能被调度。
+- PreferNoSchedule：尽量不要调度。
+- NoExecute：不仅不会调度，还会驱逐Node上已有的Pod。
+
+=== 示例
+在node1上加一个Taint，该Taint的键为key，值为value，Taint的效果是NoSchedule。这意味着除非pod明确声明可以容忍这个Taint，否则就不会被调度到node1上:
+```
+kubectl taint nodes node1  key=value:NoSchedule
+```
+
+然后需要在pod上声明Toleration。下面的Toleration设置为可以容忍具有该Taint的Node，使得pod能够被调度到node1上：
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-taints
+spec:
+  tolerations:
+  - key: "key"
+    operator: "Equal"
+    value: "value"
+    effect: "NoSchedule"
+  containers:
+    - name: pod-taints
+      image: busybox:latest
+```
+
+也可以写成如下：
+```
+tolerations:
+- key: "key"
+  operator: "Exists"
+  effect: "NoSchedule"
+```
+
+pod的Toleration声明中的key和effect需要与Taint的设置保持一致，并且满足以下条件之一：
+
+- operator的值为Exists，这时无需指定value
+- operator的值为Equal并且value相等
+
+如果不指定operator，则默认值为Equal。
+
+另外还有如下两个特例：
+
+- 空的key配合Exists操作符能够匹配所有的键和值
+- 空的effect匹配所有的effect
+
+==== effect说明
+上面的例子中effect的取值为NoSchedule，下面对effect的值作下简单说明：
+
+- NoSchedule： 如果一个pod没有声明容忍这个Taint，则系统不会把该Pod调度到有这个Taint的node上
+- PreferNoSchedule：NoSchedule的软限制版本，如果一个Pod没有声明容忍这个Taint，则系统会尽量避免把这个pod调度到这一节点上去，但不是强制的。
+- NoExecute：定义pod的驱逐行为，以应对节点故障。NoExecute这个Taint效果对节点上正在运行的pod有以下影响：
+* 没有设置Toleration的Pod会被立刻驱逐
+* 配置了对应Toleration的pod，如果没有为tolerationSeconds赋值，则会一直留在这一节点中
+* 配置了对应Toleration的pod且指定了tolerationSeconds值，则会在指定时间后驱逐
+* 从kubernetes 1.6版本开始引入了一个alpha版本的功能，即把节点故障标记为Taint（目前只针对node unreachable及node not ready，相应的NodeCondition "Ready"的值为Unknown和False）。激活TaintBasedEvictions功能后（在--feature-gates参数中加入TaintBasedEvictions=true），NodeController会自动为Node设置Taint，而状态为"Ready"的Node上之前设置过的普通驱逐逻辑将会被禁用。注意，在节点故障情况下，为了保持现存的pod驱逐的限速设置，系统将会以限速的模式逐步给node设置Taint，这就能防止在一些特定情况下（比如master暂时失联）造成的大量pod被驱逐的后果。这一功能兼容于tolerationSeconds，允许pod定义节点故障时持续多久才被逐出。
+
+== 多污点与多容忍配置
+系统允许在同一个node上设置多个taint，也可以在pod上设置多个Toleration。Kubernetes调度器处理多个Taint和Toleration能够匹配的部分，剩下的没有忽略掉的Taint就是对Pod的效果了。下面是几种特殊情况：
+
+- 如果剩余的Taint中存在effect=NoSchedule，则调度器不会把该pod调度到这一节点上。
+- 如果剩余的Taint中没有NoSchedule的效果，但是有PreferNoSchedule效果，则调度器会尝试不会pod指派给这个节点
+- 如果剩余Taint的效果有NoExecute的，并且这个pod已经在该节点运行，则会被驱逐；如果没有在该节点运行，也不会再被调度到该节点上。
+
+下面是一个示例：
+
+```
+kubectl taint nodes node1 key1=value1:NoSchedule
+kubectl taint nodes node1 key1=value1:NoExecute
+kubectl taint nodes node1 key2=value2:NoSchedule
+```
+
+在pod上设置两个toleration：
+
+```
+tolerations:
+- key: "key1"
+  operator: "Equal"
+  value: "value1"
+  effect: "NoSchedule"
+- key: "key1"
+  operator: "Equal"
+  value: "value1"
+  effect: "NoExecute"
+```
+这样的结果是该pod无法被调度到node1上，因为第三个taint没有匹配的toleration。但是如果这个Pod已经在node1上运行了，那么在运行时设置上第三个Taint，它还能继续运行，因为pod可以容忍前两个taint。
+
+一般来 说，如果给node加上effect=NoExecute的Taint，那么该 node上正在运行的所有无对应toleration的pod都会被立刻驱逐，而具有相应toleration的pod则永远不会被逐出。不过系统允许给具有NoExecute效果的Toleration加入一个可选 的tolerationSeconds字段，这个设置表明pod可以在Taint添加到node之后还能在这个node上运行多久（单位为s）：
+
+```
+tolerations:
+- key: "key1"
+  operator: "Equal"
+  value: "value1"
+  effect: "NoSchedule"
+  tolerationSeconds: 3600
+```
+
+上面的例子的意思是，如果pod正在运行，所在节点被加入一个匹配的Taint，则这个Pod会持续在这个节点上存活3600s后被驱逐。如果在这个宽限期内taint被移除，则不会触发驱逐事件。
+
+== 常见应用场景
+=== 节点独占
+如果想要拿出一部分节点，专门给特定的应用使用，则可以为节点添加这样的Taint：
+
+然后给这些应用的pod加入相应的toleration，则带有合适toleration的pod就会被允许同使用其他节点一样使用有taint的节点。然后再将这些node打上指定的标签，再通过nodeSelector或者亲和性调度的方式，要求这些pod必须运行在指定标签的节点上。
+
+=== 具有特殊硬件设备的节点
+在集群里，可能有一小部分节点安装了特殊的硬件设备，比如GPU芯片。用户自然会希望把不需要占用这类硬件的pod排除在外。以确保对这类硬件有需求的pod能够顺利调度到这些节点上。可以使用下面的命令为节点设置taint：
+
+```
+kubectl taint nodes nodename special=true:NoSchedule
+kubectl taint nodes nodename special=true:PreferNoSchedule
+```
+
+然后在pod中利用对应的toleration来保障特定的pod能够使用特定的硬件。然后同样的，我们也可以使用标签或者其他的一些特征来判断这些pod，将其调度到这些特定硬件的服务器上。
+
+=== 应对节点故障
+之前说到，在节点故障时，可以通过TaintBasedEvictions功能自动将节点设置Taint，然后将pod驱逐。但是在一些场景下，比如说网络故障造成的master与node失联，而这个node上运行了很多本地状态的应用即使网络故障，也仍然希望能够持续在该节点上运行，期望网络能够快速恢复，从而避免从这个node上被驱逐。Pod的Toleration可以这样定义：
+
+```
+tolerations:
+- key: "node.alpha.kubernetes.io/unreachable"
+  operator: "Exists"
+  effect: "NoExecute"
+  tolerationSeconds: 6000
+```
+
+对于Node未就绪状态，可以把key设置为node.kubernetes.io/not-ready。
+
+如果没有为pod指定node.kubernetes.io/not-ready的Toleration，那么Kubernetes会自动为pod加入tolerationSeconds=300的node.kubernetes.io/not-ready类型的toleration。
+
+同样，如果没有为pod指定node.kubernetes.io/unreachable的Toleration，那么Kubernetes会自动为pod加入tolerationSeconds=300的node.kubernetes.io/unreachable类型的toleration。
+
+这些系统自动设置的toleration用于在node发现问题时，能够为pod确保驱逐前再运行5min。这两个默认的toleration由Admission Controller "DefaultTolerationSeconds"自动加入。
+
+
+== 参考
+- https://www.cnblogs.com/breezey/p/9101677.html
+- https://kubernetes.io/zh/docs/concepts/configuration/taint-and-toleration/
+- https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+
