@@ -613,6 +613,149 @@ spec:
 ```
 
 == Bases and Overlays
+Kustomize有base和overlays的概念。base是一个有kustomization.yaml的目录，里面包含了一组资源和相关的自定义。base可以是本地目录，也可以是远程repo的目录，只要里面有一个kustomization.yaml就可以了。overlay是一个有kustomization.yaml的目录，它把其他的kustomization目录作为它的base。一个base对overlay没有任何了解，可以在多个overlay中使用。一个overlay可以有多个base，它将base中的所有资源组合起来，也可以在base上进行自定义。
+
+base 的样例
+
+```yaml
+# Create a directory to hold the base
+mkdir base
+# Create a base/deployment.yaml
+cat <<EOF > base/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx
+spec:
+  selector:
+    matchLabels:
+      run: my-nginx
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        run: my-nginx
+    spec:
+      containers:
+      - name: my-nginx
+        image: nginx
+EOF
+
+# Create a base/service.yaml file
+cat <<EOF > base/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-nginx
+  labels:
+    run: my-nginx
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+  selector:
+    run: my-nginx
+EOF
+# Create a base/kustomization.yaml
+cat <<EOF > base/kustomization.yaml
+resources:
+- deployment.yaml
+- service.yaml
+EOF
+```
+
+
+这个base可以在多个overlay中使用。你可以在不同的overlay中添加不同的namePrefix或其他横跨字段。下面是两个使用相同base的overlay。
+
+```yaml
+mkdir dev
+cat <<EOF > dev/kustomization.yaml
+bases:
+- ../base
+namePrefix: dev-
+EOF
+
+mkdir prod
+cat <<EOF > prod/kustomization.yaml
+bases:
+- ../base
+namePrefix: prod-
+EOF
+```
+
+
+== 如何用Kustomize 应用/查看/删除 对象
+在 kubectl 命令中使用 --kustomize 或 -k 来识别 kustomization.yaml 管理的资源。请注意，-k应该指向一个kustomization目录，如
+
+```
+kubectl apply -k <kustomization directory>/
+```
+
+给出如下的 kustomization.yaml 文件
+
+```yaml
+# Create a deployment.yaml file
+cat <<EOF > deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx
+spec:
+  selector:
+    matchLabels:
+      run: my-nginx
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        run: my-nginx
+    spec:
+      containers:
+      - name: my-nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+EOF
+
+# Create a kustomization.yaml
+cat <<EOF >./kustomization.yaml
+namePrefix: dev-
+commonLabels:
+  app: my-nginx
+resources:
+- deployment.yaml
+EOF
+```
+
+运行如下命令 apply deployment 对象 dev-my-nginx
+
+```
+> kubectl apply -k ./
+deployment.apps/dev-my-nginx created
+```
+
+运行下面任意一个命令可以查看deployment 对象 dev-my-nginx
+
+```
+kubectl get -k ./
+```
+
+```
+kubectl describe -k ./
+```
+
+运行以下命令，将deployment对象 dev-my-nginx 与应用清单时群集所处的状态进行比较。
+
+```
+kubectl diff -k ./
+```
+
+运行以下命令去删除 deployment对象 dev-my-nginx
+
+```
+> kubectl delete -k ./
+deployment.apps "dev-my-nginx" deleted
+```
 
 == kustomize 功能列别
 image:images/kustomize_d1.jpg[]
