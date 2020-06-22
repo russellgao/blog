@@ -1,2 +1,52 @@
-=
+= StatefulSet 配置文件详解
+:toc:
+:toc-title: 目录
+:toclevels: 5
+:sectnums:
+
+== 配置定义
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:[map]
+  labels: [map]
+  name: [string]
+  namespace: string
+spec:
+  podManagementPolicy: [OrderedReady,Parallel]
+# pod 管理策略，支持: OrderedReady 和 Parallel， OrderedReady pod按顺序启动
+# Parallel 并行启动或者终止所有pod
+  replicas: [number]
+# 副本数
+  selector:
+    matchLabels: [map]
+# selector.matchLabels 用于选取需要管理的pod，和下面 template.metadata.labels 保持一致
+  serviceName: [string]
+# 绑定一个headless service ，无头service，用于提供稳定的网络
+  updateStrategy:
+    type: [RollingUpdate,OnDelete]
+    rollingUpdate.partition
+# 滚动更新策略 , .spec.updateStrategy.type 默认是RollingUpdate, 当.spec.updateStrategy.type 设置为 OnDelete 时，它的控制器将不会自动更新 StatefulSet 中的 Pod
+#  当 .spec.updateStrategy.type 被设置为 RollingUpdate 时，StatefulSet 控制器会删除和重建 StatefulSet 中的每个 Pod
+# .spec.updateStrategy.rollingUpdate.partition 可以更好的支持 阶段更新、执行金丝雀或执行分阶段展开
+  volumeClaimTemplates:
+  - metadata:
+      name: es-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 500Gi
+      storageClassName: alicloud-nas-elasticsearch
+      volumeMode: Filesystem
+  template:
+    metadata:
+      labels: map
+    spec:
+      ...
+
+```
+
 
