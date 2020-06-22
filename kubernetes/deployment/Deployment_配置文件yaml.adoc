@@ -1,0 +1,81 @@
+= Deployment 配置文件详解
+:toc:
+:toc-title: 目录
+:toclevels: 5
+:sectnums:
+
+== Deployment 定义
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  generation: 4
+  labels:
+    key: value
+  name: cscm-demo-web-group-1-9
+  namespace: default
+spec:
+# 定义副本数
+  replicas: 1
+# 定义deployment 管控的pod，通过label 和 pod 进行关联，需要和下面template 中定义的一致(这里定义的label是template 中的子集)
+  selector:
+    matchLabels:
+      label1: value1
+
+# 定义升级策略，默认为RollingUpdate
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+
+# 以下为pod的定义，参考pod定义章节,定义pod 启动模版
+  template:
+    metadata:
+      annotations:
+        ...
+      labels:
+        ...
+    spec:
+      ...
+
+```
+
+==  样例
+以部署kibana 为例
+
+```yaml
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: elk
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kibana
+  template:
+    metadata:
+      labels:
+        app: kibana
+    spec:
+      containers:
+        - name: kibana
+          image: kibana:6.7.2
+          imagePullPolicy: IfNotPresent
+          readinessProbe:
+            tcpSocket:
+              port: 5601
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 5601
+            initialDelaySeconds: 15
+            periodSeconds: 20
+```
+

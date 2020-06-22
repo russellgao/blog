@@ -1,0 +1,77 @@
+= Deployment 原理
+:toc:
+:toc-title: 目录
+:toclevels: 5
+:sectnums:
+
+== 概述
+作为最常用的 Kubernetes 对象，Deployment 经常会用来创建 ReplicaSet 和 Pod，我们往往不会直接在集群中使用 ReplicaSet 部署一个新的微服务，一方面是因为 ReplicaSet 的功能其实不够强大，一些常见的更新、扩容和缩容运维操作都不支持，Deployment 的引入就是为了就是为了支持这些复杂的操作。
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.7.9
+        ports:
+        - containerPort: 80
+```
+
+当我们在 Kubernetes 集群中创建上述 Deployment 对象时，它不只会创建 Deployment 资源，还会创建另外的 ReplicaSet 以及三个 Pod 对象：
+
+```
+$ kubectl get deployments.apps
+NAME               READY     UP-TO-DATE   AVAILABLE   AGE
+nginx-deployment   3/3       3            3           6m55s
+
+$ kubectl get replicasets.apps
+NAME                          DESIRED   CURRENT   READY     AGE
+nginx-deployment-76bf4969df   3         3         3         7m27s
+
+$ kubectl get pods
+NAME                                READY     STATUS    RESTARTS   AGE
+nginx-deployment-76bf4969df-58gxj   1/1       Running   0          7m42s
+nginx-deployment-76bf4969df-9jgk9   1/1       Running   0          7m42s
+nginx-deployment-76bf4969df-m4pkg   1/1       Running   0          7m43s
+```
+
+每一个 Deployment 都会和它的依赖组成以下的拓扑结构，在这个拓扑结构中的子节点都是『稳定』的，任意节点的删除都会被 Kubernetes 的控制器重启：
+
+```
+graph TD
+    Deployment-.->ReplicaSet
+    ReplicaSet-.->Pod1
+    ReplicaSet-.->Pod2
+    ReplicaSet-.->Pod3
+```
+
+所有的 Deployment 对象都是由 Kubernetes 集群中的 DeploymentController 进行管理，家下来我们将开始介绍该控制器的实现原理。
+
+== Deployment 使用
+- 事件和状态查看：可以查看Deployment的升级详细进度和状态。
+- 回滚：当升级pod镜像或者相关参数的时候发现问题，可以使用回滚操作回滚到上一个稳定的版本或者指定的版本。
+- 版本记录: 每一次对Deployment的操作，都能保存下来，给予后续可能的回滚使用。
+- 暂停和启动：对于每一次升级，都能够随时暂停和启动。
+- 多种升级方案：Recreate----删除所有已存在的pod,重新创建新的; RollingUpdate----滚动升级，逐步替换的策略，同时滚动升级时，支持更多的附加参数，例如设置最大不可用pod数量，最小升级间隔时间等等。
+
+== 部署策略
+
+
+== 参考
+- https://draveness.me/kubernetes-deployment/
+- https://my.oschina.net/gibsonxue/blog/1840887
+
