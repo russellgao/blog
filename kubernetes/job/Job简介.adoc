@@ -1,0 +1,97 @@
+= Job
+:toc:
+:toc-title: 目录
+:toclevels: 5
+:sectnums:
+
+== 概述
+Job负责批量处理短暂的一次性任务 (short lived one-off tasks)，即仅执行一次的任务，它保证批处理任务的一个或多个Pod成功结束。
+
+Kubernetes支持以下几种Job：
+
+- 非并行Job：通常创建一个Pod直至其成功结束
+- 固定结束次数的Job：设置.spec.completions，创建多个Pod，直到.spec.completions个Pod成功结束
+- 带有工作队列的并行Job：设置.spec.Parallelism但不设置.spec.completions，当所有Pod结束并且至少一个成功时，Job就认为是成功
+
+根据.spec.completions和.spec.Parallelism的设置，可以将Job划分为以下几种pattern：
+
+
+|===
+|Job类型	|使用示例	|行为	|completions|	Parallelism
+|一次性Job	|数据库迁移|	创建一个Pod直至其成功结束|	1	|1
+|固定结束次数的Job|	处理工作队列的Pod	| 依次创建一个Pod运行直至completions个成功结束|	2+ |	1
+|固定结束次数的并行Job	| 多个Pod同时处理工作队列|	依次创建多个Pod运行直至completions个成功结束|	2+	| 2+
+|并行Job	|多个Pod同时处理工作队列|	创建一个或多个Pod直至有一个成功结束|	1|	2+
+
+|===
+
+== Job Controller
+Job Controller负责根据Job Spec创建Pod，并持续监控Pod的状态，直至其成功结束。如果失败，则根据restartPolicy（只支持OnFailure和Never，不支持Always）决定是否创建新的Pod再次重试任务。
+
+image:images/job.png[]
+
+== Job Spect 格式
+- spec.template格式同Pod
+- RestartPolicy仅支持Never或OnFailure
+- 单个Pod时，默认Pod成功运行后Job即结束
+- .spec.completions标志Job结束需要成功运行的Pod个数，默认为1，不为1时会一次创建多个pod去执行completions次
+- .spec.parallelism标志并行运行的Pod的个数，默认为1
+- spec.activeDeadlineSeconds标志失败Pod的重试最大时间，超过这个时间不会继续重试
+
+一个简单的例子：
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pi
+spec:
+  template:
+    metadata:
+      name: pi
+    spec:
+      containers:
+      - name: pi
+        image: perl
+        command: ["perl",  "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+      restartPolicy: Never
+```
+
+固定结束次数的Job示例
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: busybox
+spec:
+  completions: 3
+  template:
+    metadata:
+      name: busybox
+    spec:
+      containers:
+      - name: busybox
+        image: busybox
+        command: ["echo", "hello"]
+      restartPolicy: Never
+```
+
+== Job模式
+Job有几种典型的模式应用于不同的业务场景：
+
+- 基于Job模版进行扩展:
+* 需要先编写一个通用的Job模版，根据不同的参数生成多个Job json/yml文件用于Job的创建，可以使用相同的标签进行Job管理。
+- 按每个工作项目排列的队列:
+* 需要用户提前准备好一个消息队列服务，比如rabbitMQ，该服务是一个公共组件，每个工作项目可以往里塞任务消息。
+* 用户可以创建并行Job，需要能适用于该消息队列，然后从该消息队列中消费任务，并进行处理直到消息被处理完。
+* 该模式下，用户需要根据项目数量填写spec.completions, 并行数量.spec.parallelism可以根据实际情况填写。该模式下就是以所有的任务都成功完成了，job才会成功结束。
+- 可变任务数量的队列
+* 需要用户提前准备好一个存储服务来保存工作队列，比如Redis。每个项目可以往该存储服务填充消息。
+* 用户可以启动适用于该工作队列的多个并行Job，进行消息处理。与前一个Rabbit消息队列的差异在于，每个Job任务是可以知道工作队列已经空了，这时候便可以成功退出。
+* 该模式下，spec.completions需要置1， 并行数量.spec.parallelism可以根据实际情况填写。只要其中有一个任务成功完成，该Job就会成功结束。
+- 普通的静态任务
+
+== 参考
+-  https://www.kubernetes.org.cn/job
+- https://kubernetes.io/docs/concepts/workloads/controllers/job/
+- https://segmentfault.com/a/1190000016496265
