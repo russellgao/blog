@@ -1,0 +1,36 @@
+= kube-proxy 工作原理
+:toc:
+:toc-title: 目录
+:toclevels: 5
+:sectnums:
+
+== kube-proxy & service必要说明
+说到kube-proxy，就不得不提到k8s中service，下面对它们两做简单说明：
+
+- kube-proxy其实就是管理service的访问入口，包括集群内Pod到Service的访问和集群外访问service。
+- kube-proxy管理sevice的Endpoints，该service对外暴露一个Virtual IP，也成为Cluster IP, 集群内通过访问这个Cluster IP:Port就能访问到集群内对应的serivce下的Pod。
+- service是通过Selector选择的一组Pods的服务抽象，其实就是一个微服务，提供了服务的LB和反向代理的能力，而kube-proxy的主要作用就是负责service的实现。
+- service另外一个重要作用是，一个服务后端的Pods可能会随着生存灭亡而发生IP的改变，service的出现，给服务提供了一个固定的IP，而无视后端Endpoint的变化。
+
+== 服务发现
+k8s提供了两种方式进行服务发现：
+
+- 环境变量： 当你创建一个Pod的时候，kubelet会在该Pod中注入集群内所有Service的相关环境变量。需要注意的是，要想一个Pod中注入某个Service的环境变量，则必须Service要先比该Pod创建。这一点，几乎使得这种方式进行服务发现不可用。
+比如，一个ServiceName为redis-master的Service，对应的ClusterIP:Port为10.0.0.11:6379，则其对应的环境变量为：
+REDIS_MASTER_SERVICE_HOST=10.0.0.11 	REDIS_MASTER_SERVICE_PORT=6379 	REDIS_MASTER_PORT=tcp://10.0.0.11:6379 	REDIS_MASTER_PORT_6379_TCP=tcp://10.0.0.11:6379 	REDIS_MASTER_PORT_6379_TCP_PROTO=tcp 	REDIS_MASTER_PORT_6379_TCP_PORT=6379 	REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.0.11
+- DNS：这也是k8s官方强烈推荐的方式。可以通过cluster add-on的方式轻松的创建KubeDNS来对集群内的Service进行服务发现。
+
+== 发布(暴露)服务
+k8s原生的，一个Service的ServiceType决定了其发布服务的方式。
+
+- ClusterIP：这是k8s默认的ServiceType。通过集群内的ClusterIP在内部发布服务。
+- NodePort：这种方式是常用的，用来对集群外暴露Service，你可以通过访问集群内的每个NodeIP:NodePort的方式，访问到对应Service后端的Endpoint。
+- LoadBalancer: 这也是用来对集群外暴露服务的，不同的是这需要Cloud Provider的支持，比如AWS等。
+- ExternalName：这个也是在集群内发布服务用的，需要借助KubeDNS(version >= 1.7)的支持，就是用KubeDNS将该service和ExternalName做一个Map，KubeDNS返回一个CNAME记录。
+
+== kube-proxy内部原理
+
+
+== 参考
+- https://cloud.tencent.com/developer/article/1097449
+- https://www.cnblogs.com/kevingrace/p/6655153.html
