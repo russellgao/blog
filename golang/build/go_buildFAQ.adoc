@@ -1,0 +1,49 @@
+= go build 遇到的问题记录
+
+== build 之后产品的制品运行时 /bin/sh: xxx: not found
+
+如:
+
+```
+./tkctl --help
+/bin/sh: ./tkctl: not found
+
+```
+
+其中 tkctl 是用go语言编写的程序，build 之后产生的二进制包
+
+产生这个问题一般是缺少依赖的动态库，如果是在 `alpine linux`下 可以通过 readelf 查看所需的依赖库
+
+```
+readelf -d tkctl
+
+Dynamic section at offset 0x795140 contains 19 entries:
+  Tag        Type                         Name/Value
+ 0x0000000000000004 (HASH)               0x929dc0
+ 0x0000000000000006 (SYMTAB)             0x92a2e0
+ 0x000000000000000b (SYMENT)             24 (bytes)
+ 0x0000000000000005 (STRTAB)             0x929e80
+ 0x000000000000000a (STRSZ)              543 (bytes)
+ 0x0000000000000007 (RELA)               0x9299c0
+ 0x0000000000000008 (RELASZ)             24 (bytes)
+ 0x0000000000000009 (RELAENT)            24 (bytes)
+ 0x0000000000000003 (PLTGOT)             0xb95020
+ 0x0000000000000015 (DEBUG)              0x0
+ 0x0000000000000001 (NEEDED)             Shared library: [libpthread.so.0]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+ 0x000000006ffffffe (VERNEED)            0x929d60
+ 0x000000006fffffff (VERNEEDNUM)         2
+ 0x000000006ffffff0 (VERSYM)             0x929d00
+ 0x0000000000000014 (PLTREL)             RELA
+ 0x0000000000000002 (PLTRELSZ)           792 (bytes)
+ 0x0000000000000017 (JMPREL)             0x9299d8
+ 0x0000000000000000 (NULL)               0x0
+```
+
+> 如果没有readelf 可通过 `apk add --update binutils` 进行安装，如:
+```
+sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+apk add --update binutils
+```
+
+检查机器上是否有所需的依赖，如果没有可以在 https://pkgs.alpinelinux.org/packages 找所需的库进行安装
