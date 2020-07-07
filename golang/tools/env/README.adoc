@@ -1,0 +1,42 @@
+= go env
+:toc:
+:toclevels: 5
+:toc-title:
+:sectnums:
+
+== 作用
+命令go env用于打印Go语言的环境信息
+
+go env命令可打印出的Go语言通用环境信息
+
+|===
+
+| 名称 | 说明
+| CGO_ENABLED | 指明cgo工具是否可用的标识。
+| GOARCH | 程序构建环境的目标计算架构。
+| GOBIN | 存放可执行文件的目录的绝对路径。
+| GOCHAR | 程序构建环境的目标计算架构的单字符标识。
+| GOEXE | 可执行文件的后缀。
+| GOHOSTARCH | 程序运行环境的目标计算架构。
+| GOOS | 程序构建环境的目标操作系统。
+| GOHOSTOS | 程序运行环境的目标操作系统。
+| GOPATH | 工作区目录的绝对路径。
+| GORACE | 用于数据竞争检测的相关选项。
+| GOROOT | Go语言的安装目录的绝对路径。
+| GOTOOLDIR | Go工具目录的绝对路径。
+
+|===
+
+=== GORACE
+GORACE的值包含了用于数据竞争检测的相关选项。数据竞争是在并发程序中最常见和最难调试的一类bug。数据竞争会发生在多个Goroutine争相访问相同的变量且至少有一个Goroutine中的程序在对这个变量进行写操作的情况下。
+
+数据竞争检测需要被显式的开启。还记得标记-race吗？我们可以通过在执行一些标准go命令时加入这个标记来开启数据竞争检测。在这种情况下，GORACE的值就会被使用到了。支持-race标记的标准go命令包括：go test命令、go run命令、go build命令和go install命令。
+
+GORACE的值形如“option1=val1 option2=val2”，即：选项名称与选项值之间以等号“=”分隔，多个选项之间以空格“ ”分隔。数据竞争检测的选项包括log_path、exitcode、strip_path_prefix和history_size。为了设置GORACE的值，我们需要设置环境变量GORACE。或者，我们也可以在执行go命令时临时设置它，像这样：
+
+```
+hc@ubt:~/golang/goc2p/src/cnet/ctcp$ GORACE="log_path=/home/hc/golang/goc2p /race/report strip_path_prefix=home/hc/golang/goc2p/" go test -race
+```
+
+== 参考
+- https://wiki.jikexueyuan.com/project/go-command-tutorial/0.14.html

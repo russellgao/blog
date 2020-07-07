@@ -1,0 +1,114 @@
+= do doc
+:toc:
+:toclevels: 5
+:toc-title:
+:sectnums:
+
+== 作用
+`go doc` 命令可以打印附于Go语言程序实体上的文档。我们可以通过把程序实体的标识符作为该命令的参数来达到查看其文档的目的。
+
+所谓Go语言的程序实体，是指变量、常量、函数、结构体以及接口。而程序实体的标识符即是代表它们的名称。标识符又分非限定标识符和限定标识符。其中，限定标识符一般用于表示某个代码包中的程序实体或者某个结构体类型中的方法或字段。例如，标准库代码包io中的名为EOF的变量用限定标识符表示即io.EOF。又例如，如果我有一个sync.WaitGroup类型的变量wg并且想调用它的Add方法，那么可以这样写wg.Add()。其中，wg.Add就是一个限定标识符，而后面的()则代表了调用操作。
+
+下面说明怎样使用go doc命令。先来看一下go doc命令的标记。
+
+|===
+|标记名称	|标记描述
+|-c	|加入此标记后会使go doc命令区分参数中字母的大小写。默认情况下，命令是大小写不敏感的。
+|-cmd|	加入此标记后会使go doc命令同时打印出main包中的可导出的程序实体（其名称的首字母大写）的文档。默认情况下，这部分文档是不会被打印出来的。
+|-u|	加入此标记后会使go doc命令同时打印出不可导出的程序实体（其名称的首字母小写）的文档。默认情况下，这部分文档是不会被打印出来的。
+|===
+
+go doc命令可以后跟一个或两个参数。当然，我们也可以不附加任务参数。如果不附加参数，那么go doc命令会试图打印出当前目录所代表的代码包的文档及其中的包级程序实体的列表。
+
+== 例子
+以mysql 为例
+```
+查看mysql的文档
+go doc  mysql
+
+go doc  mysql
+package mysql // import "github.com/go-sql-driver/mysql"
+
+Package mysql provides a MySQL driver for Go's database/sql package.
+
+The driver should be used via the database/sql package:
+
+    import "database/sql"
+    import _ "github.com/go-sql-driver/mysql"
+
+    db, err := sql.Open("mysql", "user:password@/dbname")
+
+See https://github.com/go-sql-driver/mysql#usage for details
+
+var ErrInvalidConn = errors.New("invalid connection") ...
+func DeregisterLocalFile(filePath string)
+func DeregisterReaderHandler(name string)
+func DeregisterServerPubKey(name string)
+func DeregisterTLSConfig(key string)
+func NewConnector(cfg *Config) (driver.Connector, error)
+func RegisterDial(network string, dial DialFunc)
+func RegisterDialContext(net string, dial DialContextFunc)
+func RegisterLocalFile(filePath string)
+func RegisterReaderHandler(name string, handler func() io.Reader)
+func RegisterServerPubKey(name string, pubKey *rsa.PublicKey)
+func RegisterTLSConfig(key string, config *tls.Config) error
+func SetLogger(logger Logger) error
+type Config struct{ ... }
+    func NewConfig() *Config
+    func ParseDSN(dsn string) (cfg *Config, err error)
+type DialContextFunc func(ctx context.Context, addr string) (net.Conn, error)
+type DialFunc func(addr string) (net.Conn, error)
+type Logger interface{ ... }
+type MySQLDriver struct{}
+type MySQLError struct{ ... }
+type NullTime sql.NullTime
+
+
+查看mysql 包的 NewConnector 函数的文档
+go doc  mysql.NewConnector
+
+查看mysql 包的 Config 结构体
+go doc  mysql.Config
+package mysql // import "github.com/go-sql-driver/mysql"
+
+type Config struct {
+        User             string            // Username
+        Passwd           string            // Password (requires User)
+        Net              string            // Network type
+        Addr             string            // Network address (requires Net)
+        DBName           string            // Database name
+        Params           map[string]string // Connection parameters
+        Collation        string            // Connection collation
+        Loc              *time.Location    // Location for time.Time values
+        MaxAllowedPacket int               // Max packet size allowed
+        ServerPubKey     string            // Server public key name
+
+        TLSConfig string // TLS configuration name
+
+        Timeout      time.Duration // Dial timeout
+        ReadTimeout  time.Duration // I/O read timeout
+        WriteTimeout time.Duration // I/O write timeout
+
+        AllowAllFiles           bool // Allow all files to be used with LOAD DATA LOCAL INFILE
+        AllowCleartextPasswords bool // Allows the cleartext client side plugin
+        AllowNativePasswords    bool // Allows the native password authentication method
+        AllowOldPasswords       bool // Allows the old insecure password method
+        CheckConnLiveness       bool // Check connections for liveness before using them
+        ClientFoundRows         bool // Return number of matching rows instead of rows changed
+        ColumnsWithAlias        bool // Prepend table alias to column names
+        InterpolateParams       bool // Interpolate placeholders into query string
+        MultiStatements         bool // Allow multiple statements in one query
+        ParseTime               bool // Parse time values to time.Time
+        RejectReadOnly          bool // Reject read-only connections
+        // Has unexported fields.
+}
+    Config is a configuration parsed from a DSN string. If a new Config is
+    created instead of being parsed from a DSN string, the NewConfig function
+    should be used, which sets default values.
+
+func NewConfig() *Config
+func ParseDSN(dsn string) (cfg *Config, err error)
+func (cfg *Config) Clone() *Config
+func (cfg *Config) FormatDSN() string
+
+```

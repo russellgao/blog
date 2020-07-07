@@ -1,0 +1,10 @@
+= go fix与go tool fix
+:toc:
+:toclevels: 5
+:toc-title:
+:sectnums:
+
+== 作用
+
+
+

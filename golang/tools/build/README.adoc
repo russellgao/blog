@@ -1,0 +1,128 @@
+= go build
+
+== 使用
+go build [-o 输出名] [-i] [编译标记] [包名]
+
+- 如果参数为***.go文件或文件列表，则编译为一个个单独的包。
+- 当编译单个main包（文件），则生成可执行文件。
+- 当编译单个或多个包非主包时，只构建编译包，但丢弃生成的对象（.a），仅用作检查包可以构建。
+- 当编译包时，会自动忽略'_test.go'的测试文件。
+
+== 参数
+```
+
+-o
+output 指定编译输出的名称，代替默认的包名。
+-i
+install 安装作为目标的依赖关系的包(用于增量编译提速)。
+```
+
+以下 build 参数可用在 build, clean, get, install, list, run, test
+
+```
+
+        -a
+                force rebuilding of packages that are already up-to-date.
+                完全编译，不理会-i产生的.a文件(文件会比不带-a的编译出来要大？)
+        -n
+                print the commands but do not run them.
+                仅打印输出build需要的命令，不执行build动作（少用）。
+        -p n
+                the number of programs, such as build commands or
+                test binaries, that can be run in parallel.
+                The default is the number of CPUs available.
+                开多少核cpu来并行编译，默认为本机CPU核数（少用）。
+        -race
+                enable data race detection.
+                Supported only on linux/amd64, freebsd/amd64, darwin/amd64, windows/amd64,
+                linux/ppc64le and linux/arm64 (only for 48-bit VMA).
+                同时检测数据竞争状态，只支持 linux/amd64, freebsd/amd64, darwin/amd64 和 windows/amd64.
+        -msan
+                enable interoperation with memory sanitizer.
+                Supported only on linux/amd64, linux/arm64
+                and only with Clang/LLVM as the host C compiler.
+                On linux/arm64, pie build mode will be used.
+                启用与内存消毒器的互操作。仅支持linux / amd64，并且只用Clang / LLVM作为主机C编译器（少用）。
+        -v
+                print the names of packages as they are compiled.
+                打印出被编译的包名（少用）.
+        -work
+                print the name of the temporary work directory and
+                do not delete it when exiting.
+                打印临时工作目录的名称，并在退出时不删除它（少用）。
+        -x
+                print the commands.
+                同时打印输出执行的命令名（-n）（少用）
+
+        -asmflags '[pattern=]arg list'
+                arguments to pass on each go tool asm invocation.
+                传递每个go工具asm调用的参数（少用）
+        -buildmode mode
+                build mode to use. See 'go help buildmode' for more.
+                编译模式
+        -compiler name
+                name of compiler to use, as in runtime.Compiler (gccgo or gc).
+                使用的编译器 == runtime.Compiler
+        -gccgoflags '[pattern=]arg list'
+                arguments to pass on each gccgo compiler/linker invocation.
+                gccgo 编译/链接器参数（少用）
+        -gcflags '[pattern=]arg list'
+                arguments to pass on each go tool compile invocation.
+                垃圾回收参数（少用）.
+        -installsuffix suffix
+                a suffix to use in the name of the package installation directory,
+                in order to keep output separate from default builds.
+                If using the -race flag, the install suffix is automatically set to race
+                or, if set explicitly, has _race appended to it. Likewise for the -msan
+                flag. Using a -buildmode option that requires non-default compile flags
+                has a similar effect.
+        -ldflags '[pattern=]arg list'
+                arguments to pass on each go tool link invocation.
+        -linkshared
+                build code that will be linked against shared libraries previously
+                created with -buildmode=shared.
+        -mod mode
+                module download mode to use: readonly, vendor, or mod.
+                See 'go help modules' for more.
+        -modcacherw
+                leave newly-created directories in the module cache read-write
+                instead of making them read-only.
+        -modfile file
+                in module aware mode, read (and possibly write) an alternate go.mod
+                file instead of the one in the module root directory. A file named
+                "go.mod" must still be present in order to determine the module root
+                directory, but it is not accessed. When -modfile is specified, an
+                alternate go.sum file is also used: its path is derived from the
+                -modfile flag by trimming the ".mod" extension and appending ".sum".
+        -pkgdir dir
+                install and load all packages from dir instead of the usual locations.
+                For example, when building with a non-standard configuration,
+                use -pkgdir to keep generated packages in a separate location.
+        -tags tag,list
+                a comma-separated list of build tags to consider satisfied during the
+                build. For more information about build tags, see the description of
+                build constraints in the documentation for the go/build package.
+                (Earlier versions of Go used a space-separated list, and that form
+                is deprecated but still recognized.)
+        -trimpath
+                remove all file system paths from the resulting executable.
+                Instead of absolute file system paths, the recorded file names
+                will begin with either "go" (for the standard library),
+                or a module path@version (when using modules),
+                or a plain import path (when using GOPATH).
+        -toolexec 'cmd args'
+                a program to use to invoke toolchain programs like vet and asm.
+                For example, instead of running asm, the go command will run
+                'cmd args /path/to/asm <arguments for asm>'.
+
+```
+
+以上命令，单引号/双引号均可。
+
+- 对包的操作'go help packages'
+- 对路径的描述'go help gopath'
+- 对 C/C++ 的互操作'go help c'
+
+== 例子
+go build -o target/kubectl
+
