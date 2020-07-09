@@ -43,12 +43,12 @@ ln -s ~/instantclient_19_3/libclntsh.dylib ~/lib/
 from sqlalchemy import *
 
 # 连接oracle
-engine = create_engine('oracle://hd40:ylyx@121.196.127.111:1521/ylyx', encoding="utf8",echo=True)
+engine = create_engine('oracle://username:passwoed@xxxxx', encoding="utf8",echo=True)
 connection = engine.connect()
 
 # table, 会根据表名自动生成Table 对象
 meta = MetaData()
-t = Table("AREA",meta,autoload=True,autoload_with=engine)
+t = Table("abcd",meta,autoload=True,autoload_with=engine)
 
 # 获取列
 columns = t.c
@@ -56,8 +56,8 @@ print(columns)
 
 # 查询
 # s = select([t])
-# s = select([t]).where(t.c.name == "河南洛阳")
-s = select([t]).where(t.c.code == "1601")
+# s = select([t]).where(t.c.name == "xxxx")
+s = select([t]).where(t.c.code == "xxxx")
 
 
 result = connection.execute(s)
