@@ -1,0 +1,34 @@
+= exchange与queue的理解
+:toc:
+:toclevels: 5
+:toc-title:
+:sectnums:
+
+== 基本概念
+RabbitMQ是一个由erlang开发的AMQP(Advanved Message Queue)的开源实现;在RabbitMQ官网上主要有这样的模块信息, Work queues消息队列,Publish/Subscribe发布订阅服务,Routing, Topics, RPC等主要应用的模块功能.
+
+几个概念说明:
+
+- Broker:它提供一种传输服务,它的角色就是维护一条从生产者到消费者的路线，保证数据能按照指定的方式进行传输,
+- Exchange：消息交换机,它指定消息按什么规则,路由到哪个队列。
+- Queue:消息的载体,每个消息都会被投到一个或多个队列。
+- Binding:绑定，它的作用就是把exchange和queue按照路由规则绑定起来.
+- Routing Key:路由关键字,exchange根据这个关键字进行消息投递。
+- vhost:虚拟主机,一个broker里可以有多个vhost，用作不同用户的权限分离。
+- Producer:消息生产者,就是投递消息的程序.
+- Consumer:消息消费者,就是接受消息的程序.
+- Channel:消息通道,在客户端的每个连接里,可建立多个channel.
+
+== 个人理解
+- 消息发送是先发送到 Exchanges, 由 Exchanges 进行路由到 queue 中，一条消息可以根据 routekey 可以路由到一个或者
+多个queue 中
+- 当 Exchanges 为空时 用的是默认 Exchanges ，即 Exchange: (AMQP default)，此时根据queue 进行路由
+- 当设置了或者指定了 Exchange 时，必须对 Exchanges 进行绑定 routekey，否则不会对消息进行路由，
+- 消息消费只需要监听队列即可
+
+
+
+== 参考
+- https://zhuanlan.zhihu.com/p/79385336
+
+
