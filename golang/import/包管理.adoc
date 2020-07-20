@@ -1,0 +1,71 @@
+= golang 包管理,go mod, go sum,vendor
+-------
+:toc:
+:toc-title:
+:toclevels:
+:sectnums:
+
+== 参考链接
+- https://www.cnblogs.com/apocelipes/p/10295096.html
+
+== 初始化mod
+
+```
+go mod init [module name]
+```
+
+如:
+
+```
+go mod init github.com/russellgao/demo
+```
+
+运行完会创建出来一个`go.mod` 文件
+
+
+== 版本指定
+如果某些包需要指定版本可在go.mod 中指定，默认不需要修改go.mod ,会取包的最新版本。
+
+== 生成vendor
+```
+go mod vendor
+```
+
+== 参考
+go mod help
+
+```
+Go mod provides access to operations on modules.
+
+Note that support for modules is built into all the go commands,
+not just 'go mod'. For example, day-to-day adding, removing, upgrading,
+and downgrading of dependencies should be done using 'go get'.
+See 'go help modules' for an overview of module functionality.
+
+Usage:
+
+        go mod <command> [arguments]
+
+The commands are:
+
+        download    download modules to local cache
+        edit        edit go.mod from tools or scripts
+        graph       print module requirement graph
+        init        initialize new module in current directory
+        tidy        add missing and remove unused modules
+        vendor      make vendored copy of dependencies
+        verify      verify dependencies have expected content
+        why         explain why packages or modules are needed
+
+Use "go help mod <command>" for more information about a command.
+```
+
+== 包导入
+当有一个项目是私有的，不能放在网上，记为projectA ,需要在另一个项目中导入， 直接通过import 时无法使用
+
+可以在 go.mod 中通过replace 解决。例如:
+
+```
+require go-blog/handler/health-check v0.0.0
+replace go-blog/handler/health-check => ../go-blog/handler/health-check  //本地包相对路径或绝对路径
+```
