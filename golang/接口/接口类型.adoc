@@ -1,0 +1,86 @@
+= 接口类型
+:toc:
+:toc-title:
+:toclevels: 5
+:sectnums:
+
+== 介绍
+接口类型具体描述了一系列方法的集合，一个实现了这些方法的具体类型是这个接口类型的实例
+
+```go
+type ReadWriter interface {
+    Reader
+    Writer
+}
+type ReadWriteCloser interface {
+    Reader
+    Writer
+    Closer
+}
+```
+
+上面用到的语法和结构内嵌相似，我们可以用这种方式以一个简写命名另一个接口，而不用声明它 所有的方法。这种方式本称为接口内嵌。尽管略失简洁，我们可以像下面这样，不使用内嵌来声明 io.Writer接口。
+
+```go
+type ReadWriter interface {
+    Read(p []byte) (n int, err error)
+    Write(p []byte) (n int, err error)
+}
+```
+
+或者甚至使用种混合的风格:
+```go
+type ReadWriter interface {
+    Read(p []byte) (n int, err error)
+    Writer
+}
+```
+
+== 例
+```go
+package main
+
+import "fmt"
+
+type Running interface {
+	SlowRun()
+	FastRun()
+}
+
+type Swimming interface {
+	FreeStyleSwimming()
+	Breaststroke()
+}
+
+type Sport interface {
+	Running
+	Swimming
+}
+
+type Tom struct {
+	Name string
+}
+
+func (t *Tom) SlowRun() {
+	fmt.Printf("%s 慢跑\n", t.Name)
+}
+
+func (t *Tom) FastRun() {
+	fmt.Printf("%s 快跑\n", t.Name)
+}
+
+func (t *Tom) FreeStyleSwimming() {
+	fmt.Printf("%s 自由泳\n", t.Name)
+}
+
+func (t *Tom) Breaststroke() {
+	fmt.Printf("%s 蛙泳\n", t.Name)
+}
+
+func main() {
+	var t Sport
+	t = &Tom{Name: "tom"}
+	t.Breaststroke()
+}
+
+```
