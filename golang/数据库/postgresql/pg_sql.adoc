@@ -1,0 +1,122 @@
+= go 连接 pg 的方法
+
+
+== 用法
+```go
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	_ "github.com/lib/pq"
+	"os"
+)
+
+const (
+	host     = "xxx"
+	port     = 1111
+	user     = "xxx"
+	password = "xxx"
+	dbname   = "xxx"
+)
+
+func GetQueryResult(query *sql.Rows) ([]map[string]string, error) {
+	column, _ := query.Columns()              //读出查询出的列字段名
+	values := make([][]byte, len(column))     //values是每个列的值，这里获取到byte里
+	scans := make([]interface{}, len(column)) //因为每次查询出来的列是不定长的，用len(column)定住当次查询的长度
+	for i := range values {                   //让每一行数据都填充到[][]byte里面
+		scans[i] = &values[i]
+	}
+	results := []map[string]string{}
+	for query.Next() { //循环，让游标往下移动
+		if err := query.Scan(scans...); err != nil { //query.Scan查询出来的不定长值放到scans[i] = &values[i],也就是每行都放在values里
+			fmt.Println(err)
+			return nil, err
+		}
+		row := make(map[string]string) //每行数据
+		for k, v := range values {     //每行数据是放在values里面，现在把它挪到row里
+			key := column[k]
+			row[key] = string(v)
+		}
+		results = append(results, row)
+	}
+	query.Close()
+	return results, nil
+}
+func Query(db *sql.DB, sql string) ([]map[string]string, error) {
+	rows, err := db.Query(sql)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	result, err := GetQueryResult(rows)
+	return result, err
+}
+
+func Execute(db *sql.DB, sql string) (int64, error) {
+	rows, err := db.Exec(sql)
+	if err != nil {
+		return 0, err
+	}
+	rowCount, err := rows.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return rowCount, nil
+}
+
+func main() {
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
+		"password=%s dbname=%s sslmode=disable",
+		host, port, user, password, dbname)
+	db, err := sql.Open("postgres", psqlInfo)
+	if err != nil {
+		fmt.Println(err)
+		panic(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Successfully connected!")
+
+	sql1 := `CREATE TABLE accounts (
+	user_id serial PRIMARY KEY,
+	username VARCHAR ( 50 )  NOT NULL,
+	password VARCHAR ( 50 ) NOT NULL,
+	email VARCHAR ( 255 )  NOT NULL,
+	created_on TIMESTAMP NOT NULL,
+        last_login TIMESTAMP
+);
+`
+	errCode, err := Execute(db, sql1)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(errCode)
+
+	sql2 := `insert into accounts (user_id , username ,password,email,created_on) values
+	(4,'gaoweizong','123456','gaoweizong@hd123.com',now()) ;`
+
+	errCode, err = Execute(db, sql2)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(errCode)
+
+	sql3 := "select * from accounts"
+	rows, err := Query(db, sql3)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	fmt.Println(rows)
+}
+
+```
+
+== 参考
+- github.com/lib/pq
