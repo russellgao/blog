@@ -1,0 +1,124 @@
+= grpc-go 用法
+
+== 安装
+```
+go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc
+```
+
+== generate
+```
+protoc --go-grpc_out=. --go_out=. helloworld.proto
+```
+
+== example
+=== greet
+==== proto
+```
+syntax = "proto3" ;
+
+option objc_class_prefix = "HLW" ;
+option go_package = "grpc/helloworld" ;
+
+service Greeter {
+  rpc SayHello(HelloRequest) returns (HelloReply) {}
+}
+
+message HelloRequest {
+  string name = 1 ;
+}
+
+message HelloReply {
+  string message = 1 ;
+}
+```
+
+==== server
+```
+package main
+
+import (
+	"context"
+	"google.golang.org/grpc"
+	pb "russellgao.com/gomoddemo/grpc/helloworld"
+	"log"
+	"net"
+)
+
+const (
+	port = ":50051"
+)
+
+type server struct {
+	pb.UnimplementedGreeterServer
+}
+
+func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
+	log.Printf("Received: %v", in.GetName())
+	return &pb.HelloReply{
+		Message: "hello " + in.GetName(),
+	}, nil
+}
+
+func main() {
+	lis, err := net.Listen("tcp", port)
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	s := grpc.NewServer()
+	pb.RegisterGreeterServer(s, &server{})
+	if err := s.Serve(lis); err != nil {
+		log.Fatal("failed to server: %v", err)
+	}
+}
+
+```
+
+==== client
+```
+package main
+
+import (
+	"context"
+	"google.golang.org/grpc"
+	pb "russell.com/gomoddemo/grpc/helloworld"
+	"log"
+	"os"
+	"time"
+)
+
+const (
+	address     = "localhost:50051"
+	defaultName = "world"
+)
+
+func main() {
+	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewGreeterClient(conn)
+
+	name := defaultName
+	if len(os.Args) > 1 {
+		name = os.Args[1]
+	}
+	ctx, cancal := context.WithTimeout(context.Background(), time.Hour)
+	defer cancal()
+	r, err := c.SayHello(ctx, &pb.HelloRequest{Name: name})
+	if err != nil {
+		log.Fatalf("could not greet: %v", err)
+	}
+	log.Printf("Greeting: %s", r.GetMessage())
+}
+
+```
+=== greet update
+如果rpc 接口有更新，需要先更新 proto 文件，再重新generate ，最后对应更新 server/client 的代码
+
+
+
+== 参考
+- https://github.com/grpc/grpc-go
+- https://grpc.io/docs/languages/go/quickstart/
