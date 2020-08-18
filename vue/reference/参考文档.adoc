@@ -1,0 +1,9 @@
+= vue 参考资料
+
+- https://github.com/PanJiaChen/vue-element-admin
+- https://cn.vuejs.org/v2/guide/
+- https://ts.xcatliu.com/introduction/what-is-typescript.html
+- https://element.eleme.cn/#/zh-CN
+- https://es6.ruanyifeng.com/
+
+

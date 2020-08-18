@@ -1,0 +1,28 @@
+= vue 安装
+:toc:
+:toc-title:
+:toclevels: 5
+:sectnums:
+
+== vue 特点
+- 简洁： HTML 模板 + JSON 数据，再创建一个 Vue 实例，就这么简单。
+- 数据驱动： 自动追踪依赖的模板表达式和计算属性。
+- 组件化： 用解耦、可复用的组件来构造界面。
+- 轻量： ~24kb min+gzip，无依赖。
+- 快速： 精确有效的异步批量 DOM 更新。
+- 模块友好： 通过 NPM 或 Bower 安装，无缝融入你的工作流。
+
+== NPM 安装
+```
+# 最新稳定版本
+$ npm install vue
+# 最新稳定 CSP 兼容版本
+$ npm install vue@csp
+# 开发版本（直接从 GitHub 安装）
+$ npm install vuejs/vue#dev
+```
+
+== Bower 安装
+```
+bower install vue
+```
