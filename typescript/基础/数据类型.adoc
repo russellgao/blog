@@ -1,0 +1,152 @@
+= 数据类型
+:toc:
+:toc-title:
+:toclevels: 5
+:sectnums:
+
+== 原始数据类型
+- 布尔值 : boolean
+- 数值型 : number
+- 字符串 : string
+- 空值 : void
+- Null 和 Undefined : 可以使用 null 和 undefined 来定义这两个原始数据类型：
+```
+let u: undefined = undefined;
+let n: null = null;
+```
+
+与 void 的区别是，undefined 和 null 是所有类型的子类型。也就是说 undefined 类型的变量，可以赋值给 number 类型的变量：
+```
+// 这样不会报错
+let num: number = undefined;
+```
+
+而 void 类型的变量不能赋值给 number 类型的变量：
+```
+let u: void;
+let num: number = u;
+
+// Type 'void' is not assignable to type 'number'.
+```
+
+```
+let user = 'Tom'
+let isDone: boolean = false
+let decliteral: number = 6
+let hexLiteral: number = 0xf00d
+let notANumer: number = NaN
+let myName: string = "Tom" ;
+let myName1: string = 'Tom' ;
+let myAge: number = 25 ;
+let sentence: string = `Hello, my name is ${myName} .
+I'll be ${myAge + 1} years olds next month` ;
+
+function alertName() : void {
+    alert("My name is Tom")
+}
+
+let u: undefined = undefined
+let n: null = null
+
+let num: number = undefined
+let num1: number = u
+
+```
+
+== 任意值 any
+如果是一个普通类型，在赋值过程中改变类型是不被允许的， 但如果是 any 类型，则允许被赋值为任意类型。
+
+在任意值上访问任何属性都是允许的：
+```
+let anyThing: any = 'hello';
+console.log(anyThing.myName);
+console.log(anyThing.myName.firstName);
+```
+
+也允许调用任何方法：
+```
+let anyThing: any = 'Tom';
+anyThing.setName('Jerry');
+anyThing.setName('Jerry').sayHello();
+anyThing.myName.setFirstName('Cat');
+```
+声明一个变量为任意值之后，对它的任何操作，返回的内容的类型都是任意值。
+
+变量如果在声明的时候，未指定其类型，那么它会被识别为任意值类型：
+
+== 类型推论
+如果没有明确的指定类型，那么 TypeScript 会依照类型推论（Type Inference）的规则推断出一个类型。
+
+以下代码虽然没有指定类型，但是会在编译的时候报错：
+```
+let myFavoriteNumber = 'seven';
+myFavoriteNumber = 7;
+
+// index.ts(2,1): error TS2322: Type 'number' is not assignable to type 'string'.
+```
+事实上，它等价于：
+```
+let myFavoriteNumber: string = 'seven';
+myFavoriteNumber = 7;
+
+// index.ts(2,1): error TS2322: Type 'number' is not assignable to type 'string'.
+```
+
+TypeScript 会在没有明确的指定类型的时候推测出一个类型，这就是类型推论。
+
+如果定义的时候没有赋值，不管之后有没有赋值，都会被推断成 any 类型而完全不被类型检查：
+
+== 联合类型
+联合类型（Union Types）表示取值可以为多种类型中的一种。
+
+```
+let myFavoriteNumber: string | number;
+myFavoriteNumber = 'seven';
+myFavoriteNumber = 7;
+```
+
+```
+let myFavoriteNumber: string | number;
+myFavoriteNumber = true;
+
+// index.ts(2,1): error TS2322: Type 'boolean' is not assignable to type 'string | number'.
+//   Type 'boolean' is not assignable to type 'number'.
+```
+
+联合类型使用 | 分隔每个类型
+
+这里的 let myFavoriteNumber: string | number 的含义是，允许 myFavoriteNumber 的类型是 string 或者 number，但是不能是其他类型。
+
+当 TypeScript 不确定一个联合类型的变量到底是哪个类型的时候，我们只能访问此联合类型的所有类型里共有的属性或方法：
+
+```
+function getLength(something: string | number): number {
+    return something.length;
+}
+
+// index.ts(2,22): error TS2339: Property 'length' does not exist on type 'string | number'.
+//   Property 'length' does not exist on type 'number'.
+```
+
+上例中，length 不是 string 和 number 的共有属性，所以会报错。
+
+访问 string 和 number 的共有属性是没问题的：
+```
+function getString(something: string | number): string {
+    return something.toString();
+}
+```
+
+联合类型的变量在被赋值的时候，会根据类型推论的规则推断出一个类型：
+
+```
+let myFavoriteNumber: string | number;
+myFavoriteNumber = 'seven';
+console.log(myFavoriteNumber.length); // 5
+myFavoriteNumber = 7;
+console.log(myFavoriteNumber.length); // 编译时报错
+
+// index.ts(5,30): error TS2339: Property 'length' does not exist on type 'number'.
+```
+
+

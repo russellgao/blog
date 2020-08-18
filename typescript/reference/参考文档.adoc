@@ -1,0 +1,10 @@
+= typescript 参考文档
+:toc:
+:toclevels: 5
+:toc-title:
+:sectnums:
+
+- https://ts.xcatliu.com/introduction/get-typescript.html
+
+
+
