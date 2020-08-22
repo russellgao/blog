@@ -1,0 +1,54 @@
+= Axios用法与原理
+:toc:
+:toc-title:
+:toclevels: 5
+:sectnums:
+
+axios是一个非常小巧而好用的http请求库，支持promise以及同时支持浏览器和node端。axios使用简单，配置灵活，也是vue官方推荐的请求库。另外axios源码层次清晰明了，非常适合阅读。
+
+== 特性
+- 从浏览器中创建 XMLHttpRequest
+- 从 node.js 发出 http 请求
+- 支持 Promise API
+- 拦截请求和响应
+- 转换请求和响应数据
+- 取消请求
+- 自动转换JSON数据
+- 客户端支持防止 CSRF/XSRF
+
+== api
+=== 全局
+- axios.request(config) 最终http请求都是执行这个方法
+- axios(config) 和axios.request()等价
+- axios(url[, config]) axios(config)快捷方式
+- axios.[METHODS](url, config) axios(config)快捷方式
+
+=== 自定义实例
+- axios.create(config) 自定义配置，创建实例instance。调用方式和axios方法一致
+
+=== 拦截器
+- axios.interceptors.request.use
+- axios.interceptors.response.use
+
+```js
+// 以下实例等价
+// 全局调用
+axios({
+  method:'get',
+  url:'http://bit.ly/2mTM3nY',
+  field: 123
+}) // axios(config)
+axios('http://bit.ly/2mTM3nY', {field: 123}) // axios(url[, config])
+axios.get('http://bit.ly/2mTM3nY', {field: 123}) // axios.[METHODS](url, config)
+
+// 自定义实例调用
+const instance = axios.create({
+  baseURL: 'http://bit.ly'
+});
+instance({
+  method:'get',
+  url:'2mTM3nY',
+  field: 123
+}) // instance(config)
+instance.get('2mTM3nY', {field: 123}) // instance.[METHODS](url, config)
+```

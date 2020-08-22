@@ -5,5 +5,5 @@
 - https://ts.xcatliu.com/introduction/what-is-typescript.html
 - https://element.eleme.cn/#/zh-CN
 - https://es6.ruanyifeng.com/
-
-
+- https://www.iconfont.cn/
+- https://es6.ruanyifeng.com/#docs/promise
