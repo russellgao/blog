@@ -1,0 +1,25 @@
+= ingress 使用问题记录
+:toc:
+:toc-title: 目录
+:toclevels: 5
+:sectnums:
+
+== 问题
+=== 通过nginx ingress 发布的服务 504 timeout
+
+问题现象，服务超过1分钟就 504 timeout
+
+解决方法 :
+
+- 可以通过修改nginx 的配置 ，调整 proxy-read-timeout,proxy-send-timeout ,在configmap 中修改， 参考 https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/#proxy-connect-timeout
+- 也可以在Ingress 服务中 通过注入修改， 参考 https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/
+如:
+```
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-send-timeout: 900
+    nginx.ingress.kubernetes.io/proxy-read-timeout: 900
+```
+
