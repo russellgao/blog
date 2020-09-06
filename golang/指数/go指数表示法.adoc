@@ -1,0 +1,27 @@
+= 指数表示法
+:toc:
+:toc-title:
+:toclevels:
+:sectnums:
+
+
+== 用法
+
+e 表示 10 的 n 次方，同样使用其他语言
+
+
+```package main
+
+import "fmt"
+
+func main() {
+	num1 := 5e3   // 5000
+	num2 := 5e3   // 5000
+	num3 := 5e-3  // 0.005
+	num4 := -5e-3 // -.005
+	num5 := -5e3  // -5000
+
+	fmt.Println(num1, num2, num3, num4, num5)
+}
+
+```
