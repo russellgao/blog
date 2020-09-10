@@ -1,0 +1,21 @@
+= kubernetes 目录挂在注意事项
+
+== 通过configmap 声明
+
+
+== 容器内挂在
+以filebeat为例
+
+```yaml
+volumeMounts:
+  - name: config
+    mountPath: "/usr/share/filebeat/filebeat.yml"
+    readOnly: true
+    subPath: filebeat.yml
+  - name: filebeat-data
+    mountPath: /hdapp
+```
+
+- 如果没有subPath, 则mountPath为目录
+- mountPath 不能相同
+- 如果是要在同一个目录下挂在不同的文件，则使用subPath 具体指定
