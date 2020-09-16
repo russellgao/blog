@@ -1,0 +1,21 @@
+= empty 介绍
+:toc-title:
+:toc:
+:toclevels: 5
+:sectnums:
+
+== EmptyDir类型
+EmptyDir 类型：同一个pod内的容器都能读写 EmptyDir 中文件。一旦 pod 离开了宿主机，EmptyDir 中的数据就会被永久删除。所以目前 EmptyDir 类型的 volume主 要用作临时空间。
+
+缺省情况下，EmptyDir 是使用主机磁盘进行存储的，需要使用 tmpfs 作为 emptyDir 的可用存储资源也是可以的，只需要在创建 emptyDir 卷时增加一个 emptyDir.medium 字段的定义，并赋值为 "Memory" 即可。
+
+== 根据官方给出的建议，emptyDir可以在以下几种场景下使用：
+- 临时空间，例如基于磁盘的合并排序
+- 设置检查点以从崩溃事件中恢复未执行完毕的长计算
+- 保存内容管理器容器从Web服务器容器提供数据时所获取的文件
+
+默认情况下， emptyDir 卷存储在支持该节点所使用的介质上；这里的介质可以是磁盘或 SSD 或网络存储，这取决于您的环境。 但是，您可以将 emptyDir.medium 字段设置为 "Memory"，以告诉 Kubernetes 为您安装 tmpfs（基于 RAM 的文件系统）。 虽然 tmpfs 速度非常快，但是要注意它与磁盘不同。 tmpfs 在节点重启时会被清除，并且您所写入的所有文件都会计入容器的内存消耗，受容器内存限制约束。
+
+
+== 参考
+- https://kubernetes.io/zh/docs/concepts/storage/volumes/#emptydir
