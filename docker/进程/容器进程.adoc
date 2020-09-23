@@ -1,0 +1,23 @@
+= 容器进程详解
+:toc:
+:toclevels:
+:toc-title:
+:sectnums:
+
+== 原理
+- 容器是一个单进程模型
+- 容器的生命周期等于容器PID=1 进程的生命周期
+- 容器内有多个进程时，当PID=1 退出时其他进程容器变成孤儿进程
+- 可以通过 docker top `containerid/containername` 查看挂载到主机上的进程
+
+    [root@localhost ~]# docker top jenkins
+    UID                 PID                 PPID                C                   STIME               TTY                 TIME                CMD
+    root                14874               14856               0                   Jul06               ?                   00:03:23            /sbin/tini -- /usr/local/bin/jenkins.sh
+    root                14907               14874               0                   Jul06               ?                   02:57:25            java -Duser.home=/hdapp -XX:MaxMetaspaceSize=256m -Xms256m -Xmx2048m -jar /usr/share/jenkins/jenkins.war
+    [root@opsdev ~]# ps -ef | grep 14856
+    root     14856  5048  0 7月06 ?       00:03:24 containerd-shim -namespace moby -workdir /var/lib/containerd/io.containerd.runtime.v1.linux/moby/a99d1a22b03fc5219ef77046f54848250ff4c0e5bb840db34a0c09cf30c472a6 -address /run/containerd/containerd.sock -containerd-binary /usr/bin/containerd -runtime-root /var/run/docker/runtime-runc
+    root     14874 14856  0 7月06 ?       00:03:23 /sbin/tini -- /usr/local/bin/jenkins.sh
+    root     24624 22533  0 10:09 pts/0    00:00:00 grep --color=auto 14856
+
+- 容器进程对应的主机进程的父进程是 containerd 进程
+
