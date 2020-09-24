@@ -1,0 +1,12 @@
+= tar
+:toc:
+:toclevels: 5
+:toc-title:
+:sectnums:
+
+== tar 压缩不包含前缀
+文件路径  /home/app1/logs/...
+```
+tar zcvf file.tar.gz -C /home/app1/logs/ `/home/app1/logs/`
+```
+这样压缩后，就是可以得当一个相对路径的压缩包了，直接排除掉/home/app1/logs/路径不压缩了。压缩包中只有文件了。
