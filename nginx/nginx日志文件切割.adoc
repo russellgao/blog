@@ -1,0 +1,26 @@
+
+
+## nginx 日志文件切割
+```
+#!/bin/bash
+LOGS_PATH="/usr/local/hb_openresty1_logs"
+pid_path="/usr/local/openresty/nginx/logs/nginx.pid"
+YESTERDAY=$(date -d "yesterday" +%Y-%m-%d)
+cd ${LOGS_PATH}
+mkdir ${YESTERDAY}
+ACCESS_FILE_LIST=`ls *access.log`
+ERROR_FILE_LIST=`ls *error.log`
+for ACCESS_FILE in ${ACCESS_FILE_LIST[*]}
+    do
+    mv ${LOGS_PATH}/${ACCESS_FILE} ${LOGS_PATH}/${YESTERDAY}/${YESTERDAY}_${ACCESS_FILE}
+done
+
+for ERROR_FILE in ${ERROR_FILE_LIST[*]}
+    do
+    mv ${LOGS_PATH}/${ERROR_FILE} ${LOGS_PATH}/${YESTERDAY}/${YESTERDAY}_${ERROR_FILE}
+done
+
+## 向 Nginx 主进程发送 USR1 信号。USR1 信号是重新打开日志文件
+kill -USR1 `cat ${pid_path}`
+
+```
