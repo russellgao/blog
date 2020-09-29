@@ -1,0 +1,30 @@
+= supervisord 进程保持
+
+
+== 安装
+```
+yum install supervisor-3.4.0-1.el7.noarch
+
+```
+
+== 配置
+
+```
+[program:test]
+command = xxx
+autostart = true
+autorestart = true
+startsecs = 5
+startretries = 3
+```
+
+== 启动
+```
+[program:test]
+command = xxx
+autostart = true
+autorestart = true
+startsecs = 5
+startretries = 3
+```
+
