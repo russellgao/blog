@@ -1,0 +1,44 @@
+= es 如何开启权限认证
+:toc:
+:toclevels: 5
+:toc-title:
+:sectnums:
+
+== 背景
+elasticsearch从6.8 和7.1开始不再需要付费购买auth认证功能
+
+== 原理
+认证通过 x-pack 插件实现的
+
+== x-pack操作文档
+=== elastsearch
+==== 切换到elastsearch的目录下，使用下列命令生成证书
+```
+su elasticsearch
+bin/elasticsearch-certutil cert -out config/elastic-certificates.p12 -pass ""
+```
+
+==== 打开config/elasticsearch.yml，在尾部添加下面一行代码：
+```
+xpack.security.enabled: true
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.verification_mode: certificate
+xpack.security.transport.ssl.keystore.path: elastic-certificates.p12
+xpack.security.transport.ssl.truststore.path: elastic-certificates.p12
+```
+
+==== 启动elasticsearch
+
+===== 生成密码
+用bin/elasticsearch-setup-passwords auto命令自动生成好几个默认用户和密码。
+
+如果想手动生成密码，则使用bin/elasticsearch-setup-passwords interactive命令。一般默认会生成好几个管理员账户，其中一个叫elastic的用户是超级管理员。
+
+> *生成的密码默认存储在 data 目录下，和es的普通数据一样存储
+
+
+=== kibana
+第一步：切换到kibana的目录下，打开config/kibana.yml，在尾部添加下面一行代码：
+
+elasticsearch.username: "xxx"
+elasticsearch.password: "xxx"
