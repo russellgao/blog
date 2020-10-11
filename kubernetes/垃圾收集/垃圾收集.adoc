@@ -1,0 +1,8 @@
+= 垃圾收集
+:toc:
+:toc-title:
+:toclevels: 5
+:sectnums:
+
+- https://k8smeetup.github.io/docs/concepts/workloads/controllers/garbage-collection/
+- https://draveness.me/kubernetes-garbage-collector/
