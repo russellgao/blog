@@ -1,0 +1,12 @@
+= Kubernetes Controller Manager 工作原理
+:toc:
+:toc-title:
+:toclevels:
+:sectnums:
+
+
+
+
+== 参考
+- https://blog.ihypo.net/15763910382218.html
+
