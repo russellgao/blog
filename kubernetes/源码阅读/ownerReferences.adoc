@@ -1,0 +1,18 @@
+= ownerReferences
+:toc:
+:toclevels: 5
+:toc-title:
+:sectnums:
+
+== ownerReferences 作用
+某些 Kubernetes 对象是其它一些对象的属主。 例如，一个 ReplicaSet 是一组 Pod 的属主。 具有属主的对象被称为是属主的 附属 。 每个附属对象具有一个指向其所属对象的 metadata.ownerReferences 字段。
+
+有时，Kubernetes 会自动设置 ownerReference 的值。 例如，当创建一个 ReplicaSet 时，Kubernetes 自动设置 ReplicaSet 中每个 Pod 的 ownerReference 字段值。 在 Kubernetes 1.8 版本，Kubernetes 会自动为某些对象设置 ownerReference 的值。 这些对象是由 ReplicationController、ReplicaSet、StatefulSet、DaemonSet、Deployment、 Job 和 CronJob 所创建或管理的。
+
+你也可以通过手动设置 ownerReference 的值，来指定属主和附属之间的关系。
+
+
+
+
+== 参考
+- https://kubernetes.io/zh/docs/concepts/workloads/controllers/garbage-collection/
