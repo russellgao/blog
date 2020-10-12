@@ -1,0 +1,89 @@
+= 问题诊断
+:toc:
+:toc-title:
+:toclevels:
+:sectnums:
+
+== 应用故障排查-了解状态机制
+首先要了解一下 K8s 中的一个设计理念，就是这个状态机制。因为 K8s 是整个的一个设计是面向状态机的，它里面通过 yaml 的方式来定义的是一个期望到达的一个状态，而真正这个 yaml 在执行过程中会由各种各样的 controller来负责整体的状态之间的一个转换。
+
+image:https://images.gitbook.cn/Fv1SNFibPhnu1hzgc4HvJ-XejxEj[]
+
+image:https://images.gitbook.cn/FmWSz1Y4Bfj7zyDJhc-Rplrz6Yuu[]
+
+比如说上面的图，实际上是一个 Pod 的一个生命周期。刚开始它处在一个 pending 的状态，那接下来可能会转换到类似像 running，也可能转换到 Unknown，甚至可以转换到 failed。然后，当 running 执行了一段时间之后，它可以转换到类似像 successded 或者是 failed，然后当出现在 unknown 这个状态时，可能由于一些状态的恢复，它会重新恢复到 running 或者 successded 或者是 failed。
+
+其实 K8s 整体的一个状态就是基于这种类似像状态机的一个机制进行转换的，而不同状态之间的转化都会在相应的 K8s对象上面留下来类似像 Status 或者像 Conditions 的一些字段来进行表示。
+
+像下面这张图其实表示的就是说在一个 Pod 上面一些状态位的一些展现。
+
+image:https://images.gitbook.cn/FnaNXmJuY0OIVStCW2qDnWVOiAO2[]
+
+比如说在 Pod 上面有一个字段叫 Status，这个 Status 表示的是 Pod 的一个聚合状态，在这个里面，这个聚合状态处在一个 pending 状态。
+
+然后再往下看，因为一个 pod 里面有多个 container，每个 container 上面又会有一个字段叫 State，然后 State 的状态表示当前这个 container 的一个聚合状态。那在这个例子里面，这个聚合状态处在的是 waiting 的状态，那具体的原因是因为什么呢？是因为它的镜像没有拉下来，所以处在 waiting 的状态，是在等待这个镜像拉取。然后这个 ready 的部分呢，目前是 false，因为它这个进行目前没有拉取下来，所以这个 pod 不能够正常对外服务，所以此时 ready 的状态是未知的，定义为 false。如果上层的 endpoint 发现底层这个 ready 不是 true 的话，那么此时这个服务是没有办法对外服务的。
+
+再往下是 condition，condition 这个机制表示是说：在 K8s 里面有很多这种比较小的这个状态，而这个状态之间的聚合会变成上层的这个 Status。那在这个例子里面有几个状态，第一个是 Initialized，表示是不是已经初始化完成？那在这个例子里面已经是初始化完成的，那它走的是第二个阶段，是在这个 ready 的状态。因为上面几个 container 没有拉取下来相应的镜像，所以 ready 的状态是 false。
+
+然后再往下可以看到这个 container 是否 ready，这里可以看到是 false，而这个状态是 PodScheduled，表示说当前这个 pod 是否是处在一个已经被调度的状态，它已经 bound 在现在这个 node 之上了，所以这个状态也是 true。
+
+那可以通过相应的 condition 是 true 还是 false 来判断整体上方的这个状态是否是正常的一个状态。而在 K8s 里面不同的状态之间的这个转换都会发生相应的事件，而事件分为两种： 一种叫做 normal 的事件，一种是 warning 事件。大家可以看见在这第一条的事件是有个 normal 事件，然后它相应的 reason 是 scheduler，表示说这个 pod 已经被默认的调度器调度到相应的一个节点之上，然后这个节点是 cn-beijing192.168.3.167 这个节点之上。
+
+再接下来，又是一个 normal 的事件，表示说当前的这个镜像在 pull 相应的这个 image。然后再往下是一个 warning 事件，这个 warning 事件表示说 pull 这个镜像失败了。
+
+以此类推，这个地方表示的一个状态就是说在 K8s 里面这个状态机制之间这个状态转换会产生相应的事件，而这个事件又通过类似像 normal 或者是 warning 的方式进行暴露。开发者可以通过类似像通过这个事件的机制，可以通过上层 condition Status 相应的一系列的这个字段来判断当前这个应用的具体的状态以及进行一系列的诊断。
+
+== 应用故障排查-常见应用异常
+本小节介绍一下常见应用的一些异常。首先是 pod 上面，pod 上面可能会停留几个常见的状态。
+
+=== Pod 停留在 Pending
+第一个就是 pending 状态，pending 表示调度器没有进行介入。此时可以通过 kubectl describe pod 来查看相应的事件，如果由于资源或者说端口占用，或者是由于 node selector 造成 pod 无法调度的时候，可以在相应的事件里面看到相应的结果，这个结果里面会表示说有多少个不满足的 node，有多少是因为 CPU 不满足，有多少是由于 node 不满足，有多少是由于 tag 打标造成的不满足。
+
+=== Pod 停留在 waiting
+那第二个状态就是 pod 可能会停留在 waiting 的状态，pod 的 states 处在 waiting 的时候，通常表示说这个 pod 的镜像没有正常拉取，原因可能是由于这个镜像是私有镜像，但是没有配置 Pod secret；那第二种是说可能由于这个镜像地址是不存在的，造成这个镜像拉取不下来；还有一个是说这个镜像可能是一个公网的镜像，造成镜像的拉取失败。
+
+=== Pod 不断被拉取并且可以看到 crashing
+第三种是 pod 不断被拉起，而且可以看到类似像 backoff。这个通常表示说 pod 已经被调度完成了，但是启动失败，那这个时候通常要关注的应该是这个应用自身的一个状态，并不是说配置是否正确、权限是否正确，此时需要查看的应该是 pod 的具体日志。
+
+=== Pod 处在 Runing 但是没有正常工作
+第四种 pod 处在 running 状态，但是没有正常对外服务。那此时比较常见的一个点就可能是由于一些非常细碎的配置，类似像有一些字段可能拼写错误，造成了 yaml 下发下去了，但是有一段没有正常地生效，从而使得这个 pod 处在 running 的状态没有对外服务，那此时可以通过 apply-validate-f pod.yaml 的方式来进行判断当前 yaml 是否是正常的，如果 yaml 没有问题，那么接下来可能要诊断配置的端口是否是正常的，以及 Liveness 或 Readiness 是否已经配置正确。
+
+=== Service 无法正常的工作
+最后一种就是 service 无法正常工作的时候，该怎么去判断呢？那比较常见的 service 出现问题的时候，是自己的使用上面出现了问题。因为 service 和底层的 pod 之间的关联关系是通过 selector 的方式来匹配的，也就是说 pod 上面配置了一些 label，然后 service 通过 match label 的方式和这个 pod 进行相互关联。如果这个 label 配置的有问题，可能会造成这个 service 无法找到后面的 endpoint，从而造成相应的 service 没有办法对外提供服务，那如果 service 出现异常的时候，第一个要看的是这个 service 后面是不是有一个真正的 endpoint，其次来看这个 endpoint 是否可以对外提供正常的服务。
+
+== 应用远程调试
+本节讲解的是在 K8s 里面如何进行应用的远程调试，远程调试主要分为 pod 的远程调试以及 service 的远程调试。还有就是针对一些性能优化的远程调试。
+
+=== 应用远程调试 - Pod 远程调试
+首先把一个应用部署到集群里面的时候，发现问题的时候，需要进行快速验证，或者说修改的时候，可能需要类似像登陆进这个容器来进行一些诊断。
+
+image:https://images.gitbook.cn/FuR1AQmwzQmyNvmqB4AOqCasWXe0[]
+
+比如说可以通过 exec 的方式进入一个 pod。像这条命令里面，通过 kubectl exec-it pod-name 后面再填写一个相应的命令，比如说 /bin/bash，表示希望到这个 pod 里面进入一个交互式的一个 bash。然后在 bash 里面可以做一些相应的命令，比如说修改一些配置，通过 supervisor 去重新拉起这个应用，都是可以的。
+
+那如果指定这一个 pod 里面可能包含着多个 container，这个时候该怎么办呢？怎么通过 pod 来指定 container 呢？其实这个时候有一个参数叫做 -c，如上图下方的命令所示。-c 后面是一个 container-name，可以通过 pod 在指定 -c 到这个 container-name，具体指定要进入哪个 container，后面再跟上相应的具体的命令，通过这种方式来实现一个多容器的命令的一个进入，从而实现多容器的一个远程调试。
+
+=== 开源的调试工具 - kubectl-debug
+最后再给大家介绍一个开源的调试工具，它也是 kubectl 的一个插件，叫 kubectl-debug。我们知道在 K8s 里面，底层的容器 runtime 比较常见的就是类似像 docker 或者是 containerd，不论是 docker 还是 containerd，它们使用的一个机制都是基于 Linux namespace 的一个方式进行虚拟化和隔离的。
+
+通常情况下 ，并不会在镜像里面带特别多的调试工具，类似像 netstat telnet 等等这些 ，因为这个会造成应用整体非常冗余。那么如果想要调试的时候该怎么做呢？其实这个时候就可以依赖类似于像 kubectl-debug 这样一个工具。
+
+kubectl-debug 这个工具是依赖于 Linux namespace 的方式来去做的，它可以 datash 一个 Linux namespace 到一个额外的 container，然后在这个 container 里面执行任何的 debug 动作，其实和直接去 debug 这个 Linux namespace 是一致的。这里有一个简单的操作，给大家来介绍一下：
+
+这个地方其实已经安装好了 kubectl-debug，它是 kubectl 的一个插件。所以这个时候，你可以直接通过 kubectl-debug 这条命令来去诊断远程的一个 pod。像这个例子里面，当执行 debug 的时候，实际上它首先会先拉取一些镜像，这个镜像里面实际上会默认带一些诊断的工具。当这个镜像启用的时候，它会把这个 debug container 进行启动。与此同时会把这个 container 和相应的你要诊断的这个 container 的 namespace 进行挂靠，也就说此时这个 container 和你是同 namespace 的，类似像网络站，或者是类似像内核的一些参数，其实都可以在这个 debug container 里面实时地进行查看。
+
+image:https://images.gitbook.cn/FoWjhV4sD3r03T-biKRtroSrJeRN[]
+
+像这个例子里面，去查看类似像 hostname、进程、netstat 等等，这些其实都是和这个需要 debug 的 pod 是在同一个环境里面的，所以你之前这三条命令可以看到里面相关的信息。
+
+image:https://images.gitbook.cn/FowhZxpEseUMpEWfjTWWOX5QjCjV[]
+
+如果此时进行 logout 的话，相当于会把相应的这个 debug pod 杀掉，然后进行退出，此时对应用实际上是没有任何的影响的。那么通过这种方式可以不介入到容器里面，就可以实现相应的一个诊断。
+
+image:https://images.gitbook.cn/FgNL87ISOH_7znKE_1kznU0zASHv[]
+
+此外它还支持额外的一些机制，比如说我给设定一些 image，然后类似像这里面安装了的是 htop，然后开发者可以通过这个机制来定义自己需要的这个命令行的工具，并且通过这种 image 的方式设置进来。那么这个时候就可以通过这种机制来调试远程的一个 pod。
+
+
+
+
