@@ -1,0 +1,6 @@
+= operator 开发
+
+== 参考
+- https://github.com/operator-framework/operator-sdk
+- https://sdk.operatorframework.io/
+
