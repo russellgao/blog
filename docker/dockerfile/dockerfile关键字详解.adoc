@@ -1,0 +1,115 @@
+= Dockerfile 关键字
+:toc:
+:toclevels:
+:toc-title: 5
+:sectnums:
+
+
+== 关键字
+```
+Dockerfile 关键字详解
+FROM
+FROM用来指定基础包。在上面的例子中，基础包用的是ubuntu。
+MAINTAINER
+镜像作者信息，或者维护人员信息
+ADD
+将文件拷贝到Container内文件系统对应的路径
+格式 ADD <src file> <dst file>
+所有拷贝到Container中的文件和文件夹权限为0755，uid和gid为0
+如果需要修改owner用户或者权限，需要使用RUN进行修改
+ADD文件，文件路径要在docker build<PATH>中指定的<PATH>下
+RUN
+创建镜像时执行
+ENV
+用来设置环境变量
+EXPOSE
+Container内部服务开启的端口
+主机上如果要使用，还需要在启动Container时，做host-container的商品映射
+使用EXPOSE后，一些自动化布署工具可以直接读取这个信息，自动进行端口映射
+EXPOSE可以有多条，指定多个端口
+WORKDIR
+切换工作目录，可进行多次切换（相当于cd命令）
+切换目录对RUN，CMD，ENTRYPOINT有效
+USER
+执行container的用户，如未指定，则默认使用root用户
+ENTRYPOINT
+Container启动时执行的命令，一个Dockerfile中只能有一条ENTRYPOINT
+ENTRYPOINT没有CMD的可替换特性
+CMD
+Container 启动时执行的命令，一个Dockerfile 中只能有一条CMD命令，如果有多条则只执行最后一条CMD
+如果有多条命令希望在启动后执行，可以考虑使用shell 脚本
+与ENTRYPOINT的区别
+CMD的主要用途是为可执行的container提供默认命令
+CMD在运行时是可替换的，比如
+在ubuntu中，CMD指定的是/bin/bash。默认情况下运行ubuntu，container中的/bin/bash会被执行
+如果使用docker run指定运行命令，那CMD会被替换掉
+如：docker run ubuntu /bin/echo "this is a echo". 这时，container 启动后会执行echo 而不是/bin/bash了
+ENTRYPOINT是不会替换的，如果在ubuntu镜像中加入ENTRYPOINT，那ENTRYPOINT在启动后会先被执行
+CMD可以为ENTRYPOINT来提供参数
+例子：
+FROM ubuntu:14.10
+ENTRYPOINT ["top", "-b"]
+CMD ["-c"]
+VOLUME
+语法：VOLUME [PATH]
+VOLUME指令用来设置一个挂载点，可以用来让其他容器挂载以实现数据共享或对容器数据的备份、恢复或迁移
+可以将本地文件夹或者其他Container的文件夹挂载到Container中
+```
+
+== 易混淆点
+=== COPY ADD 比较
+==== ADD 的两种方式
+- ADD [--chown=<user>:<group>] <src>... <dest>
+- ADD [--chown=<user>:<group>] ["<src>",... "<dest>"] (this form is required for paths containing whitespace)
+- --chown 只在linux 下生效
+- ADD 指令 复制文件或者文件夹从本地到image 里面
+- src 是相对于dockerfile 的相对路径
+- 可以有通配符
+- 当有特殊字符时需要转义，转义规则符合golang 语法，如 文件名为： arr[0].txt ,dockerfile 写法:
+```
+ADD arr[[]0].txt /mydir/    # copy a file named "arr[0].txt" to /mydir/
+```
+- src 可以是url，默认的权限为 600
+- 如果src 是个url并且dest不是以/结尾，则会下载并且当作dest
+- 如果src 是个文件夹，则全部文件包括元信息都会copy到镜像中
+
+==== COPY 的两种形式
+- COPY [--chown=<user>:<group>] <src>... <dest>
+- COPY [--chown=<user>:<group>] ["<src>",... "<dest>"] (this form is required for paths containing whitespace)
+
+只复制文件或者目录到容器里
+
+==== 之间的区别
+- COPY不支持URL
+- 不会特别对待压缩文件。如果build 上下文件中没有指定解压的话，那么就不会自动解压，只会复制压缩文件到容器中。
+- 只复制文件或者目录到容器里
+
+=== CMD ENTRYPOINT 比较
+==== CMD 三种用法
+
+- CMD ["executable","param1","param2"] (exec form, this is the preferred form) 首选
+- CMD ["param1","param2"] (as default parameters to ENTRYPOINT)
+- CMD command param1 param2 (shell form)
+
+CMD 提供了一种默认的容器执行方式，这些缺省值可以包括可执行文件，也可以省略可执行文件，在这种情况下，您还必须指定 ENTRYPOINT
+
+如果CMD 当作 ENTRYPOINT 的参数，则 CMD，ENTRYPOINT 都应该以json 数据的形式传入
+
+==== ENTRYPOINT 的两种用法
+- ENTRYPOINT ["executable", "param1", "param2"] (exec form, preferred)
+- ENTRYPOINT command param1 param2 (shell form)
+
+entrypoint 提供了容器的运行方式
+
+==== 之间的相互关系
+- Dockerfile 必须指定其中的一个
+- 当一个容器可执行时应该定义 ENTRYPOINT
+- 当需要在容器中执行命令应该用CMD ，或者CMD 当作ENTRYPOINT 参数
+- 当容器接参数，CMD 将会被覆盖掉
+
+如果在base image 定义，entrypoint将会重置cmd的值，会设置为空，必须在当前的镜像中设置CMD的值
+
+== 参考
+- https://docs.docker.com/engine/reference/builder/
+
+
