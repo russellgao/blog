@@ -1,0 +1,31 @@
+= es 常见报错
+:toc:
+:toclevels: 5
+:toc-title:
+:sectnums:
+
+== kibana 上报错 highlight.max_analyzed_offset
+```
+"failures": [
+      {
+        "shard": 0,
+        "index": "xxx",
+        "node": "Zt2_oscKRRu4r3CP_wOO2g",
+        "reason": {
+          "type": "illegal_argument_exception",
+          "reason": "The length of [stack] field of [XLRAbnYBxVfz9V5XKg6Z] doc of [xxx] index has exceeded [1000000] - maximum allowed to be analyzed for highlighting. This maximum can be set by changing the [index.highlight.max_analyzed_offset] index level setting. For large texts, indexing with offsets or term vectors is recommended!"
+        }
+      }
+    ]
+  }
+```
+
+=== 原因
+某个文档的某个字段的长度太大，超出了高亮范围
+
+=== 解决
+调大 `highlight.max_analyzed_offset` 参数 即可
+```
+PUT $index/_settings
+{   "index" : {     "highlight.max_analyzed_offset" : 10000000   } }
+```
