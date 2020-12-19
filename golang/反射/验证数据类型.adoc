@@ -1,0 +1,68 @@
+
+```go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	a1f(&A1{b1: "pol"})
+}
+
+type A1 struct {
+	b1 string
+}
+
+func a1f(v interface{}) {
+	switch ft := v.(type) {
+	case float64:
+		fmt.Println("float64")
+		fmt.Println(ft)
+	case string:
+		fmt.Println("string")
+		fmt.Println(ft)
+	case A1:
+		fmt.Println("A1")
+		fmt.Println(ft)
+	case *A1:
+		fmt.Println("*A1")
+		fmt.Println(ft)
+	}
+}
+
+// 以下代码来自 amqp
+// github.com/streadway/amqp
+
+type Decimal struct {
+	Scale uint8
+	Value int32
+}
+
+func validateField(f interface{}) error {
+	switch fv := f.(type) {
+	case nil, bool, byte, int, int16, int32, int64, float32, float64, string, []byte, Decimal, time.Time:
+		return nil
+
+	case []interface{}:
+		for _, v := range fv {
+			if err := validateField(v); err != nil {
+				return fmt.Errorf("in array %s", err)
+			}
+		}
+		return nil
+
+		//case Table:
+		//	for k, v := range fv {
+		//		if err := validateField(v); err != nil {
+		//			return fmt.Errorf("table field %q %s", k, err)
+		//		}
+		//	}
+		//	return nil
+	}
+
+	return fmt.Errorf("value %T not supported", f)
+}
+
+```
