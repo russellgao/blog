@@ -1,0 +1,23 @@
+= k8s 中的常见问题处理
+:toc:
+:toc-title:
+:toclevels: 5
+:sectnums:
+
+
+== pod 启动是报错 unable to attach or mount volumes
+=== 问题现象
+Pod 一直处于 Creating 中，通过 describe po 可以看到如下报错
+
+```
+unable to attach or mount volumes : unmounted volumes=[...] unattached volumes=[...] timeout waiting for the condition
+```
+
+=== 原因
+pod 中设置了 fsGroup ，挂载的目录文件很多，所以在挂载时会执行 授权操作 `chown` ， chown 耗时很长。
+
+```yaml
+      securityContext:
+        fsGroup: 1000
+```
+
