@@ -4,7 +4,25 @@
 :toc-title:
 :sectnums:
 
+== 下载
+在release 中选择自己合适的版本
+
+https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.3.1/kubebuilder_2.3.1_darwin_amd64.tar.gz
+
+== 生成
+
+kubebuilder init  --domain russellgao.cn --repo github.com/russellgao/logstash-operator
+
+kubebuilder create api --group apps --version v1alpha1 --kind Logstash
+
+
+== 案例
+logstash-operator
+
+- https://github.com/russellgao/logstash-operator
+
 == 参考
 - https://github.com/kubernetes-sigs/kubebuilder
 - https://book.kubebuilder.io/quick-start.html
+- https://segmentfault.com/a/1190000020359577
 
