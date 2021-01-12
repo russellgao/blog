@@ -23,3 +23,4 @@ image:images/gitlab-arch.png[]
 |Sidekiq	|用于执行异步的后台队列任务的功能组件
 |GitLab Pages	|GitLab所提供的一项功能，允许用户发布从仓库发布静态的web站点
 |===
+
