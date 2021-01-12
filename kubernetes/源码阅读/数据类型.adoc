@@ -1,0 +1,27 @@
+= kubernetes 中的数据类型
+:toc:
+:toclevels: 5
+:toc-title:
+:sectnums:
+
+== 介绍
+在 Kubernetes 中，我们对如何设计 API 有一些原则。也就是说，所有序列化的字段必须是 驼峰式 ，所以我们使用的 JSON 标签需要遵循该格式。我们也可以使用omitempty 标签来标记一个字段在空的时候应该在序列化的时候省略。
+
+字段可以使用大多数的基本类型。数字是个例外：出于 API 兼容性的目的，我们只允许三种数字类型。对于整数，需要使用 int32 和 int64 类型；对于小数，使用 resource.Quantity 类型。
+
+=== resource.Quantity
+Quantity 是十进制数的一种特殊符号，它有一个明确固定的表示方式，使它们在不同的机器上更具可移植性。 你可能在 Kubernetes 中指定资源请求和对 pods 的限制时已经注意到它们。
+
+它们在概念上的工作原理类似于浮点数：它们有一个 significand、基数和指数。它们的序列化和人类可读格式使用整数和后缀来指定值，就像我们描述计算机存储的方式一样。
+
+例如，值 2m 在十进制符号中表示 0.002。 2Ki 在十进制中表示 2048 ，而 2K 在十进制中表示 2000。 如果我们要指定分数，我们就换成一个后缀，让我们使用一个整数：2.5 就是 2500m。
+
+有两个支持的基数：10 和 2（分别称为十进制和二进制）。十进制基数用 “普通的” SI 后缀表示（如 M 和 K ），而二进制基数用 “mebi” 符号表示（如 Mi 和 Ki ）。 对比 link:https://en.wikipedia.org/wiki/Binary_prefix[megabytes vs mebibytes]。
+
+
+=== metav1.Time
+还有一个我们使用的特殊类型：metav1.Time。 它有一个稳定的、可移植的序列化格式的功能，其他与 time.Time 相同。
+
+
+== 参考
+- https://cloudnative.to/kubebuilder/cronjob-tutorial/api-design.html
