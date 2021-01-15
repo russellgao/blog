@@ -30,7 +30,7 @@ Job Controller负责根据Job Spec创建Pod，并持续监控Pod的状态，直�
 
 image:images/job.png[]
 
-== Job Spect 格式
+== Job Spec 格式
 - spec.template格式同Pod
 - RestartPolicy仅支持Never或OnFailure
 - 单个Pod时，默认Pod成功运行后Job即结束
