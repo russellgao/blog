@@ -1,0 +1,31 @@
+= service 调试
+:toc:
+:toclevels:
+:toc-title:
+:sectnums:
+
+== Service 是否可通过 DNS 名字访问？
+通常客户端通过 DNS 名称来匹配到 Service。
+
+从相同命名空间下的 Pod 中运行以下命令：
+
+```
+nslookup hostnames
+```
+
+```
+Address 1: 10.0.0.10 kube-dns.kube-system.svc.cluster.local
+
+Name:      hostnames
+Address 1: 10.0.1.175 hostnames.default.svc.cluster.local
+
+```
+
+如果失败，那么你的 Pod 和 Service 可能位于不同的命名空间中， 请尝试使用限定命名空间的名称（同样在 Pod 内运行）：
+
+注意这里的后缀："default.svc.cluster.local"。"default" 是我们正在操作的命名空间。 "svc" 表示这是一个 Service。"cluster.local" 是你的集群域，在你自己的集群中可能会有所不同。
+
+
+== 在pod内无法通过自己的service 访问到自己，是什么原因，如何解决？
+https://kubernetes.io/zh/docs/tasks/debug-application-cluster/debug-service/#a-pod-fails-to-reach-itself-via-the-service-ip
+
