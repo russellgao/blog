@@ -1,0 +1,49 @@
+= headless
+:toc: left
+:toc-title:
+:toclevels: 5
+:sectnums:
+
+
+== Headless Services
+有时不需要或不想要负载均衡，以及单独的 Service IP。 遇到这种情况，可以通过指定 Cluster IP（spec.clusterIP）的值为 "None" 来创建 Headless Service。
+
+你可以使用无头 Service 与其他服务发现机制进行接口，而不必与 Kubernetes 的实现捆绑在一起。
+
+对这无头 Service 并不会分配 Cluster IP，kube-proxy 不会处理它们， 而且平台也不会为它们进行负载均衡和路由。 DNS 如何实现自动配置，依赖于 Service 是否定义了选择算符。
+
+=== 带选择算符的服务
+对定义了选择算符的无头服务，Endpoint 控制器在 API 中创建了 Endpoints 记录， 并且修改 DNS 配置返回 A 记录（地址），通过这个地址直接到达 Service 的后端 Pod 上。
+
+=== 无选择算符的服务
+对没有定义选择算符的无头服务，Endpoint 控制器不会创建 Endpoints 记录。 然而 DNS 系统会查找和配置，无论是：
+
+对于 ExternalName 类型的服务，查找其 CNAME 记录
+对所有其他类型的服务，查找与 Service 名称相同的任何 Endpoints 的记录
+
+=== example
+
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-server-test
+  namespace: test
+spec:
+  clusterIP: None
+  ports:
+  - name: tcp-8080
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    image: app-server
+    product: octopus
+    stackid: oct_stk_int
+  type: ClusterIP
+
+```
+
+== 参考
+- https://kubernetes.io/zh/docs/concepts/services-networking/service/#headless-services
+
