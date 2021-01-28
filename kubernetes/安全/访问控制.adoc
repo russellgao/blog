@@ -1,0 +1,243 @@
+= Kubernetes 安全之访问控制
+:toc:
+:toclevels: 5
+:toc-title:
+:sectnums:
+
+== Kubernetes API 请求访问控制
+=== 访问控制
+大家都知道访问控制是云原生中的一个重要组成部分。也是一个 Kubernetes 集群在多租户环境下必须要采取的一个基本的安全架构手段。
+
+image:https://images.gitbook.cn/feca8cb0-5bca-11ea-a8f4-7b4742511f3f[]
+
+那么在概念上可以抽象的定义为谁在何种条件下可以对什么资源做什么操作。这里的资源就是在 Kubernetes 中我们熟知的：Pod、ConfigMaps、Deployment、Secrets 等等这样的资源模型。
+
+=== Kubernetes API 请求
+image:https://images.gitbook.cn/141dd6d0-5bcb-11ea-9473-adf7db03dae6[]
+
+由上图来介绍一下 Kubernetes API 的请求从发起到其持久化入库的一个流程。
+
+首先看一下请求的发起，请求的发起分为两个部分：
+
+- 第一个部分是人机交互的过程。是大家非常熟悉的用 kubectl 对 api-server 的一个请求过程；
+- 第二个部分是 Pod 中的业务逻辑与 api-server 之间的交互。
+
+当我们的 api-server 收到请求后，就会开启访问控制流程。这里面分为三个步骤：
+
+- Authentication 认证阶段：判断请求用户是否为能够访问集群的合法用户。如果用户是个非法用户，那 api-server 会返回一个 401 的状态码，并终止该请求；
+- 如果用户合法的话，我们的 api-server 会进入到访问控制的第二阶段 Authorization：鉴权阶段。在该阶段中 api-server 会判断用户是否有权限进行请求中的操作。如果无权进行操作，api-server 会返回 403 的状态码，并同样终止该请求；
+- 如果用户有权进行该操作的话，访问控制会进入到第三个阶段——AdmissionControl。在该阶段中 api-server 的 Admission Control 会判断请求是否是一个安全合规的请求。如果最终验证通过的话，访问控制流程才会结束。
+
+此时我们的请求将会转换为一个 Kubernetes objects 相应的变更请求，最终持久化到 ETCD 中。
+
+== Kubernetes 认证
+=== Kubernetes 中的用户模型
+对于认证来说，首先我们要确定请求的发起方是谁。并最终通过认证过程将其转换为一个系统可识别的用户模型用于后期的鉴权，那么先来看一下 Kubernetes 中的用户模型。
+
+1. Kubernetes 没有自身的用户管理能力
+
+    什么是用户管理能力呢？我们无法像操作 Pod 一样，通过 API 的方式创建删除一个用户实例。同时我们也无法在 ETCD 中找到用户对应的存储对象。
+
+2. Kubernetes 中的用户通常是通过请求凭证设置
+
+    在 Kubernetes 的访问控制流程中用户模型是如何产生的呢？答案就在请求方的访问控制凭证中，也就是我们平时使用的 kube-config 中的证书，或者是 Pod 中引入的 ServerAccount。经过 Kubernetes 认证流程之后，api-server 会将请求中凭证中的用户身份转化为对应的 User 和 Groups 这样的用户模型。在随后的鉴权操作和审计操作流程中，api-server 都会使用到该用户模型实例。
+
+3. Kubernetes 支持的请求认证方式主要包括：
+- Basic 认证
+
+    该认证方式下，管理员会将 Username 和 Password 组成的白名单放置在 api-server 读取的静态配置文件上面进行认证，该方式一般用于测试场景，在安全方面是不推荐且不可拓展的一种方式。
+
+- X509 证书认证
+    该方式是 api-server 中相对应用较多的使用方式，首先访问者会使用由集群 CA 签发的，或是添加在 api-server Client CA 中授信 CA 签发的客户端证书去访问 api-server。api-server 服务端在接收到请求后，会进行 TLS 的握手流程。除了验证证书的合法性，api-server 还会校验客户端证书的请求源地址等信息。开启双向认证，X509 认证是一个比较安全的方式，也是 Kubernetes 组件之间默认使用的认证方式，同时也是 kubectl 客户端对应的 kube-config 中经常使用到的访问凭证。
+- Bearer Tokens(JSON Web Tokens)
+* Service Account
+* OpenID Connect
+* Webhooks
+
+该方式的 Tokens 是通用的 JWT 的形式，其中包含了签发者、用户的身份、过期时间等多种元信息。它的认证方式也是常见的私钥加签，公钥验签的一个基本流程。基于 Token 的认证使用场景也很广泛，比如 Kubernetes Pod 应用中经常使用到的 Service Account，其中就会自动绑定一个签名后的 JWT Token 用于请求 api-server。
+
+另外 api-server 还支持基于 OpenID 协议的 Token 认证，可以通过对 api-server 的配置连接一个指定的外部 IDP，同时可以通过 Keycloak，Dex 这样的开源服务来管理 IDP，请求者可以按照自己熟悉的方式在原身份认证服务上进行登录认证，并最终返回一个相应的 JWT token，为了后面的 api-server 的鉴权流程。
+
+除此之外，还可以使用 Webhooks 的方式，将请求的 Token 发送到指定外部服务进行 Token 的验签。
+
+
+X509 证书认证
+
+image:https://images.gitbook.cn/6d4c0a10-5bcb-11ea-93b5-3993d9eab61e[]
+
+对于一个集群证书体系来说，认证机构 (CA) 是一个非常重要的证书对。它会被默认放置在集群 Master 节点上的 /etc/Kubernetes/pki/ 目录下。集群中所有组件之间的通讯用到的证书，其实都是由集群根 CA 来签发的。在证书中有两个身份凭证相关的重要字段：一个是 CN，一个是 O。
+
+另外可以通过 OpenSSL 命令来进行证书的解析。上图右侧可以看到，通过 Subject 中的 O 和 CN 字段可以查看对应的信息。
+
+image:https://images.gitbook.cn/8039ecf0-5bcb-11ea-8cbb-53ebfaa72e60[]
+
+上面每一个组件证书都有自己指定的 Common Name 和 Organization 用于特定角色的绑定。这样的设置可以使各系统组件只绑定自身功能范围内的角色权限。从而保证了每个系统组件自身权限的最小化。
+
+=== 证书签发 API
+image:https://images.gitbook.cn/8cbb3830-5bcb-11ea-bd6c-43eeac1b3938[]
+
+Kubernetes 集群本身就提供了证书签发的 API，而在集群的创建过程中，像 kube-admin 这样的集群安装工具，会基于不同的 CSR 签发请求调用 api-server 对应接口。此时 api-server 会根据请求，以这种 csr 资源模型的形式创建对应的签发请求实例。刚开始创建的签发实例都会处于 pending 的状态，直到有权限的管理员进行审批后，这个 csr 才会处于 approved 的状态，请求对应的证书就会被签发。
+
+通过上图右侧中的命令可以来查看相应的证书内容信息。
+
+=== 签发用户证书
+image:https://images.gitbook.cn/98c334c0-5bcb-11ea-8cbb-53ebfaa72e60[]
+
+首先开发人员需用通过 OpenSSL 等证书工具生成私钥，然后创建对应的 X509 csr 请求文件，需要在 sbuj 字段中指定用户 user 和组 group，最后通过 API 创建 K8s csr 实例并等待管理员审批。
+
+对于集群管理员，他可以直接读取集群根 CA，并通过 X509 的 csr 请求文件签发证书，所以它无需定义或审批 csr 实例。上图中最后一行是一个 OpenSSL 签发示例，命令中需要指明 csr 和 ca.crt 的文件路径，以及签发证书的过期时间信息。
+
+另外各个云厂商也会基于登录用户和目标集群直接生成访问凭证，一键化流程，方便用户的使用。
+
+=== Service Accounts
+image:https://images.gitbook.cn/b11d0820-5bcb-11ea-9cd5-8967f4762932[]
+
+除了证书认证之外，Service Account 也是 api-server 中应用比较广泛的一种方式。对于 Service Account 来说，它是 Kub 中唯一能够通过 API 方式管理的 APIService 访问凭证，其他特性在上图中可以看到。
+
+图中也给出了一些使用 kubectl 进行 Service Account API 相关增删改查的示例，同时我们也为已经存在的 Service Account 主动的创建其 Token 对应的 Secret，有兴趣的同学可以在 Kubernetes 集群中操作执行一下。
+
+接着看一下 Service Account 的使用。
+
+image:https://images.gitbook.cn/dc5b6f90-5bcb-11ea-a695-8f4c079b036d[]
+
+首先可以通过 get secrets 命令查看对应 Service Account 中对应的 secret，其中 token 字段经过了 base64 位编码的 JWT 格式认证 token。
+
+image:https://images.gitbook.cn/e4cfbe10-5bcb-11ea-ba65-b3f91b8de18a[]
+
+在部署一个应用时，可以通过 Template-spec-serviceAccountName 字段声明需要使用的 Service Account 名称。注意如果是在 Pod 创建过程中，发现制定的 ServiceAccount 不存在，则该 Pod 创建过程会被终止。
+
+在生成的 Pod 模板中可以看到指定 Service Account 对应的 secret 中的 CA namespace 和认证 token 会分别以文件的形式挂载到容器中的指定目录下，另外对于已经创建的 Pod，我们不能更新其已经挂载的 ServiceAccount 内容。
+
+=== 生成 kubeconfig
+kubeconfig 是用户本地连接 Kubernetes 集群使用的重要访问凭证，接着来介绍一下 kubeconfig 的配置和使用。
+
+image:https://images.gitbook.cn/00d868a0-5bcc-11ea-9473-adf7db03dae6[]
+
+=== 使用 kubeconfig
+image:https://images.gitbook.cn/0a0c5da0-5bcc-11ea-b7a0-3967fecd90d4[]
+
+== Kubernetes 鉴权——RBAC
+当一个请求在完成 api-server 认证后，可以认为它是一个合法的用户，那么如何控制该用户在集群中的哪些 namespace 中访问哪些资源，对这些资源又能进行哪些操作呢？
+
+这就由访问控制的第二步 Kubernetes 鉴权来完成。api-server 本身支持多种鉴权方式，在本小结中，我们主要介绍在安全上推荐的鉴权方式 RBAC。
+
+===  RBAC 鉴权三要素
+image:https://images.gitbook.cn/1f0dde40-5bcc-11ea-9ab4-336f60979a3d[]
+
+- 第一要素是 Subjects，也就是主体。可以是开发人员、集群管理员这样的自然人，也可以是系统组件进程，或者是 Pod 中的逻辑进程；
+- 第二个要素是 API Resource，也就是请求对应的访问目标。在 Kubernetes 集群中也就是各类资源；
+- 第三要素是 Verbs，对应为请求对象资源可以进行哪些操作，包括增删改查、list、get、watch 等。
+
+这里举个例子，假设有个通过合法认证的用户 Bob，他请求 list 某个 namespace下的 Pods，改请求的鉴权语义记为：Can Bob list pods？其中 Bob 即为请求中的 Subject，list 为对应的请求动作 Action，而 pods 为对应的请求资源 Resource。
+
+=== RBAC 权限粒度
+
+上面介绍了 RBAC 角色模型的三要素，在整个 RBAC 策略定义下，还需要将这个角色绑定到一个具体的控制域内。这就是 Kubernetes 大家熟悉的命名空间。通过 namespace 可以将 Kubernetes api 资源限定在不同的作用域内。从而帮助我们在一个多租户集群中，对用户进行逻辑上的隔离。
+
+image:https://images.gitbook.cn/3bf96ec0-5bcc-11ea-8155-9d6d04886d5b[]
+
+上面的事例可以改为 User A can create pods in namespace B。这里需要注意的是，如果不进行任何的权限绑定，RBAC 会拒绝所有访问。
+
+通常 RBAC 会进行对 api-server 的细粒度访问控制，但是这个细粒度是个相对的概念，RBAC 是面向模型级别的绑定。它不能绑定到 namespace 中的一个具体的 object 实例，更不能绑定到指定资源的任意一个 field。
+
+RBAC 对访问权限的控制粒度上，它可以细化到 Kubernetes api 的 subresources 级别。比如针对一个访问者，我们可以控制其在指定 namespace 下对 nodes/status 模型的访问。
+
+=== RBAC - Role
+接着介绍 RBAC 具体的绑定权限和对象。
+
+image:https://images.gitbook.cn/5c7cf310-5bcc-11ea-bd6c-43eeac1b3938[]
+
+首先是角色 Role，它定义了用户在指定的 Kubernetes 命名空间资源上可以进行哪些操作。比如可以定一个 namespace 中 pod 的只读权限，同时还可以定义一个 namespace 管理员权限，它具有对这个命名空间下所有对象资源的所有操作权限。
+
+image:https://images.gitbook.cn/64973ab0-5bcc-11ea-8cbb-53ebfaa72e60[]
+
+如上图所示，是一个 Role 的定义模板编排文件，其中 resource 字段定义了这个角色可以访问哪些资源，verbs 字段定义了这个角色有哪些操作的权限。在 apiGroups 中，需要指定目标资源的 apiGroups 名称，这里可以通过官方 API 文档查询，如果指定的 Group 是 core，那么在角色模板中的 apiGroups 可置为空。
+
+=== RBAC - RoleBinding
+当我们完成了一个 namespace 下的角色定义之后，还需要建立其与使用这个角色的主体之间在 namespace 下的绑定关系，这里需要一个 RoleBinding 模型。使用 RoleBinding 可以将 Role 对应的权限模型绑定到对应的 Subject 上。
+
+image:https://images.gitbook.cn/77937570-5bcc-11ea-93b5-3993d9eab61e[]
+
+比如这里可以将名为 test 的 namespace 中的 pod 只读权限同时绑定给用户 test1 和 test2 以及 proc1。也可以将 namespace test 只读权限绑定组名称为 tech-lead 的 test1 用户，这样用户 test2 和 proc1 是没有 get namespace 权限的。
+
+接着看一下对应的 RoleBinding 编排文件模板。
+
+image:https://images.gitbook.cn/e1b525b0-5bcd-11ea-a8f4-7b4742511f3f[]
+
+其中 roleRef 字段中声明了我们需要绑定的角色，一个绑定只能指定唯一的 Role。在 subject 字段中定义了我们要绑定的对象，这里可以是 User，Group 或者是 Service Account。它同时支持绑定多个对象。
+
+=== RBAC - ClusterRole
+image:https://images.gitbook.cn/81354770-5bcc-11ea-8cbb-53ebfaa72e60[]
+
+除了定义指定 namespace 中的权限模型，也可以通过 ClusterRole 定义一个集群维度的权限模型。在一个 Cluster 实例中，可以定义集群维度的权限使用权限，比如像 PV、Nodes 在 namespace 中不可见的资源权限，可以在 ClusterRole 中定义，而操作这些资源的动作同样是之前 Role 中支持的增删改查和 list、watch 等操作。
+
+下图为 ClusterRole 编排文件模板：
+
+image:https://images.gitbook.cn/8cee39a0-5bcc-11ea-9cd5-8967f4762932[]
+
+ClusterRole 编排文件几乎和 Role 是一模一样的，唯一不同的地方是 ClusterRole 中是所有集群维度的权限定义，不支持 namespace 的定义。
+
+=== RBAC - ClusterRoleBinding
+同样在 ClusterRole 的基础上，可以将其绑定在对应的 Subject 主体上。而 ClusterRoleBinding 模型实例可以帮助我们在集群所有命名空间上将 ClusterRole 绑定到具体的 Subject 对象上。
+
+image:https://images.gitbook.cn/2b14d3f0-5bcd-11ea-9cd5-8967f4762932[]
+
+比如这里可以将所有 namespace 的 list 权限绑定给 group 为 sre 或者 devops 的管理员 admin1 和 admin2。
+
+image:https://images.gitbook.cn/1e471660-5bcd-11ea-9473-adf7db03dae6[]
+
+相比较于 RoleBinding，ClusterRoleBinding 模板定义也只是在 namespace 和 roleRef 中的权限对象模型定义上有不同，其他的定义格式是一样的。
+
+=== RABC - Default ClusterRoleBinding
+通过上面的学习，我们知道在不进行任何权限的绑定下，RABC 会拒绝所有的访问。那么我们系统组件中是如何请求的呢？
+
+其实在集群创建的时候，处理系统各组件的客户端证书，它们各自的角色和环境对象也会被创建出来，以满足组件业务之间交互必须的权限要求。
+
+下面看几个预置的集群角色：
+
+image:https://images.gitbook.cn/e9873630-5bcc-11ea-a695-8f4c079b036d[]
+
+=== 角色中的 verbs 如何设置？
+通过以上对 RBAC 的学习，大家应该对 Kubernetes 中 RBAC 中的模型定义有了一定的了解，但是在某些复杂的多租户业务场景下，如何在权限模板中针对各个 API 模型定义相应的动作策略，还是需要一定的理论和实践基础的。而对一个应用开发人员来说，kubectl 可能更为直观和熟悉些，这里也给出了一些 kubectl 操作和 RBAC 中的对应关系。
+
+image:https://images.gitbook.cn/dc21f390-5bcc-11ea-a695-8f4c079b036d[]
+
+比如希望在 edit 一个 deploy 的时候，需要在相应的角色模板中增加对 Deployment 资源的 get、patch 这样的权限。如果希望 exec 到一个 pod 中，需要在相应的角色模板中增加对 pod 的 get 权限，以及针对 pod/exec 模型的 create 权限。
+
+== Security Context 的使用
+
+CVE-2019-5736
+
+image:https://images.gitbook.cn/d0a9b3e0-5bcc-11ea-9473-adf7db03dae6[]
+
+通过对 GitHub 上的统计结果可以看到，主流的业务镜像有 82.4% 是以 root 用户来启动的。通过这个调查可以看到对 Security Context 的相关使用是不容乐观的。
+
+=== Kubernetes Runtime 安全策略
+经过对上面的分析结果可以看出来，如果我们对业务容器配置安全合适的参数，其实攻击者很难有可乘之机。那么我们究竟应该在部署 Kubernetes 集群中的业务容器做哪些 runtime 运行时刻的安全加固呢？
+
+image:https://images.gitbook.cn/c3464600-5bcc-11ea-a695-8f4c079b036d[]
+
+- 首先还是要遵循权限最小化原则，除了业务运行所必需的系统权限，其他权限都是可以去除的；
+- 此外还可以通过在 pod 或者 container 维度设置 Security Context 参数，进行业务容器运行时刻的安全配置；
+- 另外就是可以通过开启 Pod Security Policy，在 api-server 请求的 Admission 阶段强制校验容器的安全配置；
+- 除了 PSP 的开启之外，如上图还列举了常见的，比较多的配置参数。
+
+=== Pod Security Policy
+由于 PSP 策略相对复杂一些，这里介绍一下使用注意事项。
+
+image:https://images.gitbook.cn/b3ebea20-5bcc-11ea-aae6-17c0629b6dc0[]
+
+首先可以通过 API 直接操作 PSP 的安全策略实例，如上图左侧是 PSP 策略支持的配置参数。包括特权容器，系统 Capabilities，运行时刻用户 ID 和系统权限等多种配置。大家也可以在官方文档找到各个参数的详细说明。
+
+而 PSP 的作用正是在业务容器运行前，基于这个策略校验安全参数配置，如果不满足该安全策略，则禁止该 Pod 运行。
+
+最后在 PSP 的使用上，我们需要注意几点，如上图右侧所示。
+
+=== 总结——多租安全加固
+最后在对多租环境下，如何利用 Kubernetes 下原生的安全能力做安全加固做一个最佳实践的小结。
+
+image:https://images.gitbook.cn/a6ae7ad0-5bcc-11ea-9473-adf7db03dae6[]
+
+== 参考
+- https://gitbook.cn/gitchat/column/5d68b823de93ed72d6eca1bc/topic/5e5bc84c3fbd2d3f5d059b81
+
