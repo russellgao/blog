@@ -1,0 +1,11 @@
+= etcd operator
+:toc: left
+:toc-title:
+:toclevels: 5
+:sectnums:
+
+
+== 参考
+- https://github.com/improbable-eng/etcd-cluster-operator
+
+
