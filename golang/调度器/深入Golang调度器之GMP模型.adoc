@@ -1,0 +1,11 @@
+= 深入Golang调度器之GMP模型
+:toc: left
+:toclevels:
+:toc-title:
+:sectnums:
+
+
+== 参考
+- https://www.cnblogs.com/sunsky303/p/9705727.html
+- https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-goroutine/
+
