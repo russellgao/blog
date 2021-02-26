@@ -1,0 +1,49 @@
+= tee
+:toc:
+:toclevels: 5
+:toc-title:
+:sectnums:
+
+
+Linux tee命令用于读取标准输入的数据，并将其内容输出成文件。
+
+tee指令会从标准输入设备读取数据，将其内容输出到标准输出设备，同时保存成文件。
+
+例1:
+```
+[root@iZuf685opgs9oyozju9i2bZ ~]# tee readme.md
+test
+test
+tee
+tee
+a
+a
+b
+b
+c
+c
+^C
+
+[root@iZuf685opgs9oyozju9i2bZ ~]# cat readme.md
+test
+tee
+a
+b
+c
+
+```
+
+例2 :
+```
+cat <<EOF |tee k8s.conf
+> net.bridge.bridge-nf-call-ip6tables = 1
+> net.bridge.bridge-nf-call-iptables = 1
+> EOF
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+[root@iZuf685opgs9oyozju9i2bZ ~]#
+[root@iZuf685opgs9oyozju9i2bZ ~]#
+[root@iZuf685opgs9oyozju9i2bZ ~]# cat k8s.conf
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+```
