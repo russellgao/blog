@@ -1,0 +1,206 @@
+= grpc-gateway
+:toc:
+:toc-title:
+:toclevels: 5
+:sectnums:
+
+
+== 介绍
+gRPC-Gateway是谷歌协议缓冲区编译器protoc的一个插件。它读取protobuf服务定义并生成一个反向代理服务器，将RESTful HTTP API翻译成gRPC。这个服务器是根据你的服务定义中的google.api.http注释生成的。
+
+== 背景
+gRPC非常棒--它能用许多编程语言生成API客户端和 server 端代码，它速度快、易于使用、带宽效率高，而且它的设计经过了Google的实战验证。然而，你可能仍然想提供一个传统的RESTful JSON API。原因包括保持向后兼容，支持gRPC不支持的语言或客户端，以及简单地保持RESTful JSON架构的美学和工具。
+
+这个项目旨在为你的gRPC服务提供HTTP+JSON接口。在你的服务中进行少量的配置以附加HTTP语义，就能用这个库生成一个反向代理。
+
+== 安装
+下面的说明假定你使用 [Go模块](https://github.com/golang/go/wiki/Modules) 进行依赖性管理。使用 [工具依赖](https://github.com/golang/go/wiki/Modules#how-can-i-track-tool-dependencies-for-a-module) 来跟踪以下可执行包的版本。
+
+```go
+// +build tools
+
+package tools
+
+import (
+    _ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway"
+    _ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2"
+    _ "google.golang.org/grpc/cmd/protoc-gen-go-grpc"
+    _ "google.golang.org/protobuf/cmd/protoc-gen-go"
+)
+
+```
+
+运行 `go mod tidy` 来解决版本问题
+
+```
+$ go install \
+    github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway \
+    github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2 \
+    google.golang.org/protobuf/cmd/protoc-gen-go \
+    google.golang.org/grpc/cmd/protoc-gen-go-grpc
+
+```
+
+== 用法
+
+=== 定义grpc
+
+
+your_service.proto
+```
+ syntax = "proto3";
+ package your.service.v1;
+ option go_package = "github.com/yourorg/yourprotos/gen/go/your/service/v1";
+
+ message StringMessage {
+   string value = 1;
+ }
+
+ service YourService {
+   rpc Echo(StringMessage) returns (StringMessage) {}
+ }
+
+```
+
+=== 生成 gRPC stubs
+使用 protoc 生成
+
+```
+protoc -I . \
+    --go_out ./gen/go/ --go_opt paths=source_relative \
+    --go-grpc_out ./gen/go/ --go-grpc_opt paths=source_relative \
+    your/service/v1/your_service.proto
+
+```
+
+=== 实现 grpc service
+按照通用方法实现 grpc server
+
+=== 利用 protoc-gen-grpc-gateway 生成 proxy
+有3种可选的方法 :
+
+- 不做进一步修改，使用默认的HTTP语义映射（方法、路径等）。
+* 这将对任何 .proto 文件起作用，但不允许设置HTTP路径、请求参数或类似内容
+- 修改 .proto 文件以使用自定义映射
+* 依靠 .proto 文件中的参数来设置自定义的HTTP映射
+- 不修改 .proto 文件，但是使用额外的配置文件
+* 依靠一个外部配置文件来设置自定义的HTTP映射
+* 当源程序文件不在你的控制之下时是有用的。
+
+使用自定义的注解
+
+增加 `google.api.http` annotation 到 .proto 文件
+
+```
+ syntax = "proto3";
+ package your.service.v1;
+ option go_package = "github.com/yourorg/yourprotos/gen/go/your/service/v1";
++
++import "google/api/annotations.proto";
++
+ message StringMessage {
+   string value = 1;
+ }
+
+ service YourService {
+-  rpc Echo(StringMessage) returns (StringMessage) {}
++  rpc Echo(StringMessage) returns (StringMessage) {
++    option (google.api.http) = {
++      post: "/v1/example/echo"
++      body: "*"
++    };
++  }
+ }
+```
+
+更多的 annotations 样例 : https://github.com/grpc-ecosystem/grpc-gateway/blob/master/examples/internal/proto/examplepb/a_bit_of_everything.proto
+
+如果你使用 protoc 来生成存根，你需要确保编译器在编译时可以获得所需的依赖性。这些可以通过手动克隆和复制 [googleapis](https://github.com/googleapis/googleapis) 仓库中的相关文件找到，并在运行时提供给 protoc。你将需要的文件是:
+
+```
+google/api/annotations.proto
+google/api/field_behaviour.proto
+google/api/http.proto
+google/api/httpbody.proto
+```
+
+下面是一个protoc执行可能的样子 :
+
+```
+protoc -I . --grpc-gateway_out ./gen/go \
+    --grpc-gateway_opt logtostderr=true \
+    --grpc-gateway_opt paths=source_relative \
+    your/service/v1/your_service.proto
+```
+
+=== 为HTTP反向代理服务器编写一个入口点
+```go
+package main
+
+import (
+  "context"
+  "flag"
+  "net/http"
+
+  "github.com/golang/glog"
+  "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+  "google.golang.org/grpc"
+
+  gw "github.com/yourorg/yourrepo/proto/gen/go/your/service/v1/your_service"  // Update
+)
+
+var (
+  // command-line options:
+  // gRPC server endpoint
+  grpcServerEndpoint = flag.String("grpc-server-endpoint",  "localhost:9090", "gRPC server endpoint")
+)
+
+func run() error {
+  ctx := context.Background()
+  ctx, cancel := context.WithCancel(ctx)
+  defer cancel()
+
+  // Register gRPC server endpoint
+  // Note: Make sure the gRPC server is running properly and accessible
+  mux := runtime.NewServeMux()
+  opts := []grpc.DialOption{grpc.WithInsecure()}
+  err := gw.RegisterYourServiceHandlerFromEndpoint(ctx, mux,  *grpcServerEndpoint, opts)
+  if err != nil {
+    return err
+  }
+
+  // Start HTTP server (and proxy calls to gRPC server endpoint)
+  return http.ListenAndServe(":8081", mux)
+}
+
+func main() {
+  flag.Parse()
+  defer glog.Flush()
+
+  if err := run(); err != nil {
+    glog.Fatal(err)
+  }
+}
+```
+
+=== 用protoc-gen-openapiv2生成OpenAPI定义
+为了使用protoc-gen-openapiv2支持的自定义protobuf注释，我们需要在我们的protobuf生成步骤中添加另一个依赖项。
+
+```
+protoc -I . --openapiv2_out ./gen/openapiv2 \
+    --openapiv2_opt logtostderr=true \
+    your/service/v1/your_service.proto
+
+```
+
+如果你使用protoc来生成存根，你需要从这个资源库的protoc-gen-openapiv2/options目录中复制protobuf文件，并在运行时提供给protoc。
+
+- 仅生成 swagger 文件
+
+> 请注意，这个插件也支持为未注释的方法生成OpenAPI定义；使用 generate_unbound_methods 选项来启用。
+
+更多信息请参考官方文档。
+
+== 参考
+- https://github.com/grpc-ecosystem/grpc-gateway
+- https://grpc-ecosystem.github.io/grpc-gateway/
